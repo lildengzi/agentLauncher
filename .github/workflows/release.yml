@@ -67,6 +67,15 @@ jobs:
               target/release/bundle/msi/*.msi
               target/release/bundle/nsis/*.exe
               target/release/dsh-launcher.exe
+          # Windows aarch64 (ARM64) — native windows-11-arm runner (free for public repos)
+          - os: windows-11-arm
+            arch: aarch64
+            target: aarch64-pc-windows-msvc
+            artifact_name: dsh-launcher-windows-aarch64
+            asset_pattern: |
+              target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi
+              target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
+              target/aarch64-pc-windows-msvc/release/dsh-launcher.exe
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -177,21 +186,23 @@ jobs:
         run: |
           set -e
           RELEASE_DIR="target/${{ matrix.target }}/release"
-          PKG_NAME="dsh-launcher-${{ matrix.arch }}-macos"
-          mkdir -p "dist/${PKG_NAME}"
+          ARCH="${{ matrix.arch }}"
+          mkdir -p dist
 
-          # Copy .app bundle
-          cp -r "${RELEASE_DIR}/bundle/macos/"*.app "dist/${PKG_NAME}/" 2>/dev/null || true
+          # Native installer: .dmg (renamed per-arch so x86_64 and aarch64 don't collide)
+          for dmg in "${RELEASE_DIR}/bundle/dmg/"*.dmg; do
+            [ -e "$dmg" ] || continue
+            cp "$dmg" "dist/dsh-launcher-${ARCH}-macos.dmg"
+          done
 
-          # Copy binary
-          cp "${RELEASE_DIR}/dsh-launcher" "dist/${PKG_NAME}/" 2>/dev/null || true
+          # .app bundle (zipped, since .app is a directory)
+          APP=$(ls -d "${RELEASE_DIR}/bundle/macos/"*.app 2>/dev/null | head -1)
+          if [ -n "$APP" ]; then
+            (cd "$(dirname "$APP")" && zip -qr - "$(basename "$APP")") > "dist/dsh-launcher-${ARCH}-macos.zip"
+          fi
 
-          # Copy DMG
-          cp -r "${RELEASE_DIR}/bundle/dmg/"* "dist/${PKG_NAME}/" 2>/dev/null || true
-
-          # Create .zip package
-          (cd dist && zip -r "${PKG_NAME}.zip" "${PKG_NAME}")
-          echo "Created dist/${PKG_NAME}.zip"
+          echo "== dist contents =="
+          ls -lh dist/
 
       - name: Create release packages (Windows)
         if: runner.os == 'Windows'
@@ -199,21 +210,18 @@ jobs:
         shell: pwsh
         run: |
           $releaseDir = "target/${{ matrix.target }}/release"
-          $pkgName = "dsh-launcher-${{ matrix.arch }}-windows"
-          New-Item -ItemType Directory -Force -Path "dist/$pkgName" | Out-Null
+          $arch = "${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
 
-          # Copy binary
-          Copy-Item "${releaseDir}/dsh-launcher.exe" "dist/$pkgName/" -ErrorAction SilentlyContinue
+          # Native installers: MSI + NSIS setup .exe (uploaded directly)
+          Copy-Item "${releaseDir}/bundle/msi/*.msi"  "dist/" -ErrorAction SilentlyContinue
+          Copy-Item "${releaseDir}/bundle/nsis/*.exe" "dist/" -ErrorAction SilentlyContinue
 
-          # Copy NSIS installer
-          Copy-Item "${releaseDir}/bundle/nsis/*.exe" "dist/$pkgName/" -ErrorAction SilentlyContinue
+          # Portable: zip of the raw executable
+          Compress-Archive -Path "${releaseDir}/dsh-launcher.exe" -DestinationPath "dist/dsh-launcher-${arch}-windows.zip" -Force
 
-          # Copy MSI
-          Copy-Item "${releaseDir}/bundle/msi/*.msi" "dist/$pkgName/" -ErrorAction SilentlyContinue
-
-          # Create .zip
-          Compress-Archive -Path "dist/$pkgName/*" -DestinationPath "dist/${pkgName}.zip" -Force
-          echo "Created dist/${pkgName}.zip"
+          Write-Host "== dist contents =="
+          Get-ChildItem dist | Format-Table Name,Length
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -229,6 +237,9 @@ jobs:
             src-tauri/dist/*.rpm
             src-tauri/dist/*.AppImage
             src-tauri/dist/*.pkg.tar.zst
+            src-tauri/dist/*.dmg
+            src-tauri/dist/*.msi
+            src-tauri/dist/*.exe
             src-tauri/dist/*.zip
 
       - name: Upload artifacts for manual release
@@ -241,5 +252,8 @@ jobs:
             src-tauri/dist/*.rpm
             src-tauri/dist/*.AppImage
             src-tauri/dist/*.pkg.tar.zst
+            src-tauri/dist/*.dmg
+            src-tauri/dist/*.msi
+            src-tauri/dist/*.exe
             src-tauri/dist/*.zip
           retention-days: 30
