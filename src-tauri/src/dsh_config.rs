@@ -32,8 +32,7 @@ fn credentials_path() -> Result<PathBuf, String> {
 
 fn is_posix_identifier(k: &str) -> bool {
     !k.is_empty()
-        && k
-            .chars()
+        && k.chars()
             .next()
             .map(|c| c.is_ascii_alphabetic() || c == '_')
             .unwrap_or(false)

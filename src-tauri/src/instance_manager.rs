@@ -76,13 +76,7 @@ fn slugify(name: &str) -> String {
     let mut s: String = name
         .to_lowercase()
         .chars()
-        .map(|c| {
-            if c.is_alphanumeric() {
-                c
-            } else {
-                '-'
-            }
-        })
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
         .collect();
     while s.contains("--") {
         s = s.replace("--", "-");
