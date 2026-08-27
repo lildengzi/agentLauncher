@@ -1,8 +1,9 @@
 mod dsh_config;
-mod dsh_runner;
+mod executor;
 mod instance_manager;
+mod runtime;
 
-use dsh_runner::RunnerState;
+use executor::RunnerState;
 use instance_manager::{Instance, NewInstance};
 use serde_json::json;
 use tauri::{AppHandle, State};
@@ -44,12 +45,12 @@ async fn start_instance(
     id: String,
     task: Option<String>,
 ) -> Result<(), String> {
-    dsh_runner::start(app, state, id, task).await
+    executor::start(app, state, id, task).await
 }
 
 #[tauri::command]
 async fn stop_instance(state: State<'_, RunnerState>, id: String) -> Result<(), String> {
-    dsh_runner::stop(state, id).await
+    executor::stop(state, id).await
 }
 
 // ---- misc -----------------------------------------------------------------
