@@ -63,6 +63,16 @@ fn open_instance_folder(app: AppHandle, id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Open a URL in the default browser (e.g. the dsh web-UI URL surfaced when a
+/// web instance starts). The launcher hosts no agent UI of its own — interaction
+/// happens in dsh's own web page.
+#[tauri::command]
+fn open_url(app: AppHandle, url: String) -> Result<(), String> {
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 /// Curated plugin catalog for the Hub. dsh has no remote plugin market, so
 /// discovery is a curated list; entries carrying a real `package` (npm name) can
 /// be installed/removed for real via `dsh plugin add|remove` (see dsh_config).
@@ -147,6 +157,7 @@ pub fn run() {
             start_instance,
             stop_instance,
             open_instance_folder,
+            open_url,
             list_mcp_catalog,
             dsh_config::list_credential_keys,
             dsh_config::set_credential,

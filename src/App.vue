@@ -17,6 +17,7 @@ const { t } = useI18n();
 const instances = ref<Instance[]>([]);
 const selectedId = ref<string | null>(null);
 const statuses = ref<Record<string, RunStatus>>({});
+const urls = ref<Record<string, string>>({});
 const editOpen = ref(false);
 const editingInstance = ref<Instance | null>(null);
 const hubOpen = ref(false);
@@ -35,6 +36,9 @@ const runningIds = computed(() =>
 );
 const selectedStatus = computed<RunStatus>(() =>
   selectedId.value ? statuses.value[selectedId.value] ?? "idle" : "idle"
+);
+const selectedUrl = computed<string | null>(() =>
+  selectedId.value ? urls.value[selectedId.value] ?? null : null
 );
 const statusLabelMap: Record<RunStatus, string> = {
   idle: "status.idle",
@@ -59,6 +63,12 @@ onMounted(async () => {
   await loadInstances();
   unlistenStatus = await onDshStatus((e) => {
     statuses.value = { ...statuses.value, [e.instanceId]: e.status };
+    if (e.url) {
+      urls.value = { ...urls.value, [e.instanceId]: e.url };
+    } else if (e.status === "exited" || e.status === "error") {
+      const { [e.instanceId]: _drop, ...rest } = urls.value;
+      urls.value = rest;
+    }
   });
 });
 onBeforeUnmount(() => unlistenStatus?.());
@@ -81,6 +91,8 @@ async function onSaved(inst: Instance) {
 async function start(task?: string) {
   const id = selectedId.value;
   if (!id) return;
+  const { [id]: _drop, ...rest } = urls.value;
+  urls.value = rest;
   consoleOpen.value = true;
   statuses.value = { ...statuses.value, [id]: "starting" };
   try {
@@ -88,6 +100,11 @@ async function start(task?: string) {
   } catch (e) {
     statuses.value = { ...statuses.value, [id]: "error" };
     console.error(e);
+  }
+}
+async function openWeb() {
+  if (selectedUrl.value) {
+    await api.openUrl(selectedUrl.value).catch(console.error);
   }
 }
 function activate(id: string) {
@@ -175,8 +192,9 @@ function noop() {}
       v-model:open="consoleOpen"
       :instance="selectedInstance"
       :status="selectedStatus"
-      @run="start"
+      :url="selectedUrl"
       @stop="stop"
+      @open-web="openWeb"
     />
     <EditInstanceDialog
       v-model:open="editOpen"

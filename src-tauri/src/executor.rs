@@ -11,9 +11,11 @@ use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_opener::OpenerExt;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::sync::mpsc;
 
+use crate::dsh_config;
 use crate::instance_manager;
 use crate::runtime::{self, SpawnRequest};
 
@@ -39,9 +41,18 @@ struct StatusEvent {
     status: String,
     code: Option<i32>,
     message: Option<String>,
+    /// For web (serve) runs: the dsh browser-UI URL once it appears on stdout.
+    url: Option<String>,
 }
 
-fn emit_status(app: &AppHandle, id: &str, status: &str, code: Option<i32>, message: Option<String>) {
+fn emit_status(
+    app: &AppHandle,
+    id: &str,
+    status: &str,
+    code: Option<i32>,
+    message: Option<String>,
+    url: Option<String>,
+) {
     let _ = app.emit(
         "dsh-status",
         StatusEvent {
@@ -49,6 +60,7 @@ fn emit_status(app: &AppHandle, id: &str, status: &str, code: Option<i32>, messa
             status: status.to_string(),
             code,
             message,
+            url,
         },
     );
 }
@@ -81,19 +93,42 @@ fn parse_env(path: &std::path::Path) -> Vec<(String, String)> {
     out
 }
 
-/// Spawn a reader that streams a pipe to the frontend as chunks.
-fn spawn_reader<R>(app: AppHandle, id: String, stream: &'static str, reader: R)
+/// Extract the first `http(s)://…` token from a chunk (the dsh web server prints
+/// `dsh web: http://127.0.0.1:<port>` on startup). Reads up to the first
+/// whitespace or quote.
+fn find_url(s: &str) -> Option<String> {
+    let start = s.find("http://").or_else(|| s.find("https://"))?;
+    let rest = &s[start..];
+    let end = rest
+        .find(|c: char| c.is_whitespace() || c == '"' || c == '\'')
+        .unwrap_or(rest.len());
+    Some(rest[..end].to_string())
+}
+
+/// Spawn a reader that streams a pipe to the frontend as chunks. When
+/// `detect_url` is set (the stdout of a web/serve run), it also scans for the
+/// dsh browser-UI URL, and on the first hit opens it in the default browser and
+/// re-emits a `running` status carrying the URL for the frontend.
+fn spawn_reader<R>(app: AppHandle, id: String, stream: &'static str, reader: R, detect_url: bool)
 where
     R: tokio::io::AsyncRead + Unpin + Send + 'static,
 {
     tokio::spawn(async move {
         let mut buf = [0u8; 4096];
         let mut r = BufReader::new(reader);
+        let mut opened = false;
         loop {
             match r.read(&mut buf).await {
                 Ok(0) => break,
                 Ok(n) => {
                     let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
+                    if detect_url && !opened {
+                        if let Some(url) = find_url(&chunk) {
+                            opened = true;
+                            let _ = app.opener().open_url(url.clone(), None::<&str>);
+                            emit_status(&app, &id, "running", None, None, Some(url));
+                        }
+                    }
                     emit_log(&app, &id, stream, chunk);
                 }
                 Err(_) => break,
@@ -118,6 +153,11 @@ pub async fn start(
     let inst_dir = instance_manager::instance_dir(&id)?;
     let env_path = inst_dir.join(".env");
 
+    // A web-capable profile boots dsh's browser-UI server (long-running, prints a
+    // URL); anything else runs a one-shot task. The runtime assembles the matching
+    // command; here we only need to know whether to watch stdout for the URL.
+    let serve = dsh_config::profile_is_web_capable(&inst.profile);
+
     let task_text = task
         .filter(|t| !t.trim().is_empty())
         .or_else(|| {
@@ -129,7 +169,7 @@ pub async fn start(
         })
         .unwrap_or_else(|| "介绍一下你自己，并列出当前 workspace 里的文件。".to_string());
 
-    emit_status(&app, &id, "starting", None, None);
+    emit_status(&app, &id, "starting", None, None, None);
 
     // Assemble the launch command via this instance's runtime (dsh today). The
     // runtime owns binary/args/task-passing and per-run config overlays; the
@@ -142,7 +182,7 @@ pub async fn start(
     }) {
         Ok(c) => c,
         Err(e) => {
-            emit_status(&app, &id, "error", None, Some(e.clone()));
+            emit_status(&app, &id, "error", None, Some(e.clone()), None);
             return Err(e);
         }
     };
@@ -154,20 +194,20 @@ pub async fn start(
 
     let mut child = cmd.spawn().map_err(|e| {
         let msg = format!("无法启动 dsh: {e}");
-        emit_status(&app, &id, "error", None, Some(msg.clone()));
+        emit_status(&app, &id, "error", None, Some(msg.clone()), None);
         msg
     })?;
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     if let Some(out) = stdout {
-        spawn_reader(app.clone(), id.clone(), "stdout", out);
+        spawn_reader(app.clone(), id.clone(), "stdout", out, serve);
     }
     if let Some(err) = stderr {
-        spawn_reader(app.clone(), id.clone(), "stderr", err);
+        spawn_reader(app.clone(), id.clone(), "stderr", err, false);
     }
 
-    emit_status(&app, &id, "running", None, None);
+    emit_status(&app, &id, "running", None, None, None);
 
     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
     state.0.lock().unwrap().insert(id.clone(), kill_tx);
@@ -180,11 +220,11 @@ pub async fn start(
         tokio::select! {
             status = child.wait() => {
                 let code = status.ok().and_then(|s| s.code());
-                emit_status(&app_wait, &id_wait, "exited", code, None);
+                emit_status(&app_wait, &id_wait, "exited", code, None, None);
             }
             _ = kill_rx.recv() => {
                 let _ = child.kill().await;
-                emit_status(&app_wait, &id_wait, "exited", None, Some("已手动结束".into()));
+                emit_status(&app_wait, &id_wait, "exited", None, Some("已手动结束".into()), None);
             }
         }
         map.lock().unwrap().remove(&id_wait);

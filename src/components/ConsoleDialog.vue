@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { SendHorizonal, Square, Eraser } from "lucide-vue-next";
+import { Square, Eraser, Globe } from "lucide-vue-next";
 import Dialog from "@/components/ui/Dialog.vue";
 import Button from "@/components/ui/Button.vue";
-import Input from "@/components/ui/Input.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import StatusDot from "@/components/ui/StatusDot.vue";
 import LogTerminal from "@/components/LogTerminal.vue";
@@ -12,22 +11,19 @@ import { useI18n } from "@/lib/i18n";
 import type { Instance, RunStatus } from "@/types";
 
 const { t } = useI18n();
-const props = defineProps<{ instance: Instance | null; status: RunStatus }>();
-const emit = defineEmits<{ run: [task: string]; stop: [] }>();
+const props = defineProps<{
+  instance: Instance | null;
+  status: RunStatus;
+  url: string | null;
+}>();
+const emit = defineEmits<{ stop: []; openWeb: [] }>();
 const open = defineModel<boolean>("open", { default: false });
 
-const task = ref("");
 const termRef = ref<InstanceType<typeof LogTerminal> | null>(null);
 
 const busy = computed(
   () => props.status === "running" || props.status === "starting"
 );
-
-function runTask(): void {
-  if (busy.value) return;
-  emit("run", task.value);
-  task.value = "";
-}
 </script>
 
 <template>
@@ -53,17 +49,12 @@ function runTask(): void {
         />
       </div>
       <div class="flex items-center gap-2 border-t border-border bg-toolbar px-3 py-2">
-        <Input
-          v-model="task"
-          class="flex-1"
-          :placeholder="t('console.taskPlaceholder')"
-          @keydown.enter="runTask"
-        />
+        <span class="flex-1 text-[12px] text-muted-foreground">{{ t('console.readonlyHint') }}</span>
+        <Button v-if="url" variant="primary" @click="emit('openWeb')">
+          <Globe class="h-4 w-4" /> {{ t('console.openWeb') }}
+        </Button>
         <Button v-if="busy" variant="destructive" @click="emit('stop')">
           <Square class="h-4 w-4" /> {{ t('console.stop') }}
-        </Button>
-        <Button v-else variant="primary" @click="runTask">
-          <SendHorizonal class="h-4 w-4" /> {{ t('console.run') }}
         </Button>
       </div>
     </div>

@@ -48,6 +48,8 @@ export interface DshStatusEvent {
   code?: number | null;
   /** human-readable message, present on "error". */
   message?: string | null;
+  /** dsh web-UI URL, present on the "running" event of a web (serve) instance. */
+  url?: string | null;
 }
 
 /** dsh-log event payload — a raw chunk to feed straight into xterm. */

@@ -164,6 +164,33 @@ fn profile_dir(profile: &str) -> Result<PathBuf, String> {
     Ok(dsh_home()?.join("profiles").join(profile))
 }
 
+/// True when the profile boots dsh's browser-UI server rather than answering a
+/// one-shot task — i.e. its `dsh.profile.bundles` include the web-app plugin.
+/// The launcher uses this to decide the run shape (serve vs. headless task);
+/// missing/unreadable profile ⇒ false (treat as a plain task profile).
+pub fn profile_is_web_capable(profile: &str) -> bool {
+    let Ok(dir) = profile_dir(profile) else {
+        return false;
+    };
+    let text = match fs::read_to_string(dir.join("package.json")) {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    let json: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(j) => j,
+        Err(_) => return false,
+    };
+    json.get("dsh")
+        .and_then(|d| d.get("profile"))
+        .and_then(|p| p.get("bundles"))
+        .and_then(|b| b.as_array())
+        .map(|arr| {
+            arr.iter()
+                .any(|v| v.as_str() == Some("@deepseek-ai/dsh-web-app"))
+        })
+        .unwrap_or(false)
+}
+
 /// Package names in a profile's `package.json` `dependencies` — the real
 /// installed-plugin set for that profile.
 #[tauri::command]

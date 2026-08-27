@@ -7,6 +7,7 @@
 use tokio::process::Command;
 
 use super::{AgentRuntime, SpawnRequest};
+use crate::dsh_config;
 
 /// The dsh runtime. Stateless — every input comes from the `SpawnRequest`.
 pub struct DshRuntime;
@@ -19,7 +20,16 @@ impl AgentRuntime for DshRuntime {
         if let Some(p) = &patch_path {
             cmd.arg("--patch").arg(p);
         }
-        cmd.arg(req.task);
+        if dsh_config::profile_is_web_capable(&req.instance.profile) {
+            // Web profile: a long-running browser-UI server, not a one-shot task.
+            // Pass no task; keep the launcher from hijacking the browser
+            // (`--no-open` — the launcher opens the URL itself once it appears on
+            // stdout), and let the OS pick a free port (`--port 0`) so multiple
+            // web instances never collide on the default 3080.
+            cmd.arg("--no-open").arg("--port").arg("0");
+        } else {
+            cmd.arg(req.task);
+        }
         Ok(cmd)
     }
 }

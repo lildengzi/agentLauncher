@@ -26,6 +26,9 @@ export const api = {
   openInstanceFolder: (id: string) =>
     invoke<void>("open_instance_folder", { id }),
 
+  /** Open a URL (e.g. a web instance's dsh UI) in the default browser. */
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
+
   listMcpCatalog: () => invoke<McpPlugin[]>("list_mcp_catalog"),
 
   // ---- real dsh config wiring --------------------------------------------
