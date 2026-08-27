@@ -199,8 +199,7 @@ jobs:
         run: pnpm run build
 
       - name: Build Tauri app
-        working-directory: src-tauri
-        run: cargo tauri build --locked --target ${{ matrix.target }}
+        run: pnpm tauri build --target ${{ matrix.target }} -- --locked
 
       - name: Create release packages (Linux)
         if: runner.os == 'Linux'
