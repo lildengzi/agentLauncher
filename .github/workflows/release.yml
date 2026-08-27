@@ -31,8 +31,8 @@ jobs:
               target/release/bundle/deb/*.deb
               target/release/bundle/appimage/*.AppImage
               target/release/dsh-launcher
-          # Linux aarch64 (ARM64)
-          - os: ubuntu-latest
+          # Linux aarch64 (ARM64) — native arm64 runner (free for public repos)
+          - os: ubuntu-24.04-arm
             arch: aarch64
             target: aarch64-unknown-linux-gnu
             artifact_name: dsh-launcher-linux-aarch64
@@ -74,12 +74,12 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: "9"
+          version: "11"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install Rust
@@ -120,9 +120,7 @@ jobs:
             libasound2-dev \
             libjack-jackd2-dev \
             libpipewire-0.3-dev \
-            zstd \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu
+            zstd
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -131,8 +129,7 @@ jobs:
         run: pnpm run build
 
       - name: Build Tauri app
-        working-directory: src-tauri
-        run: cargo tauri build --locked --target ${{ matrix.target }}
+        run: pnpm tauri build --target ${{ matrix.target }} -- --locked
 
       - name: Create release packages (Linux)
         if: runner.os == 'Linux'
@@ -193,10 +190,10 @@ jobs:
           Copy-Item "${releaseDir}/dsh-launcher.exe" "dist/$pkgName/" -ErrorAction SilentlyContinue
 
           # Copy NSIS installer
-          Copy-Item "${releaseDir}/bundle/nsis/"*.exe "dist/$pkgName/" -ErrorAction SilentlyContinue
+          Copy-Item "${releaseDir}/bundle/nsis/*.exe" "dist/$pkgName/" -ErrorAction SilentlyContinue
 
           # Copy MSI
-          Copy-Item "${releaseDir}/bundle/msi/"*.msi "dist/$pkgName/" -ErrorAction SilentlyContinue
+          Copy-Item "${releaseDir}/bundle/msi/*.msi" "dist/$pkgName/" -ErrorAction SilentlyContinue
 
           # Create .zip
           Compress-Archive -Path "dist/$pkgName/*" -DestinationPath "dist/${pkgName}.zip" -Force
