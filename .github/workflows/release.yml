@@ -200,13 +200,6 @@ jobs:
           Compress-Archive -Path "dist/$pkgName/*" -DestinationPath "dist/${pkgName}.zip" -Force
           echo "Created dist/${pkgName}.zip"
 
-      - name: Collect release assets
-        id: assets
-        run: |
-          echo "assets<<EOF" >> $GITHUB_OUTPUT
-          ls -1 src-tauri/dist/*.zip src-tauri/dist/*.tar.zst 2>/dev/null || true
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
