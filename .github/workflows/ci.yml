@@ -57,6 +57,19 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      - name: Install Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libudev-dev \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libpipewire-0.3-dev
+
       - name: Check Rust
         working-directory: src-tauri
         run: cargo check --locked
