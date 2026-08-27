@@ -123,6 +123,12 @@ jobs:
             zstd \
             xdg-utils
 
+      - name: Install packaging tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y ruby ruby-dev build-essential libarchive-tools zip
+          sudo gem install --no-document fpm
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -138,23 +144,32 @@ jobs:
         run: |
           set -e
           RELEASE_DIR="target/${{ matrix.target }}/release"
-          PKG_NAME="dsh-launcher-${{ matrix.arch }}-linux"
-          mkdir -p "dist/${PKG_NAME}"
+          ARCH="${{ matrix.arch }}"
+          mkdir -p dist
 
-          # Copy binary
-          cp "${RELEASE_DIR}/dsh-launcher" "dist/${PKG_NAME}/"
+          # Native installers built by Tauri: .deb, .rpm, .AppImage
+          cp "${RELEASE_DIR}/bundle/deb/"*.deb           dist/ 2>/dev/null || true
+          cp "${RELEASE_DIR}/bundle/rpm/"*.rpm           dist/ 2>/dev/null || true
+          cp "${RELEASE_DIR}/bundle/appimage/"*.AppImage dist/ 2>/dev/null || true
 
-          # Copy bundles
-          cp -r "${RELEASE_DIR}/bundle/deb/"* "dist/${PKG_NAME}/" 2>/dev/null || true
-          cp -r "${RELEASE_DIR}/bundle/appimage/"* "dist/${PKG_NAME}/" 2>/dev/null || true
+          # Arch Linux package: convert Tauri's .deb into a real pacman .pkg.tar.zst.
+          # Drop the deb-derived depends and declare the correct Arch package names.
+          DEB=$(ls "${RELEASE_DIR}/bundle/deb/"*.deb 2>/dev/null | head -1)
+          if [ -n "$DEB" ]; then
+            fpm -s deb -t pacman \
+              --no-auto-depends \
+              --depends webkit2gtk-4.1 \
+              --depends gtk3 \
+              --depends libayatana-appindicator \
+              --pacman-compression zstd \
+              -p dist/ "$DEB"
+          fi
 
-          # Create .tar.zst package (Arch Linux style)
-          tar --zstd -cf "dist/${PKG_NAME}.tar.zst" -C "dist" "${PKG_NAME}"
-          echo "Created dist/${PKG_NAME}.tar.zst"
+          # Raw binary (zipped) for people who just want the executable.
+          zip -j "dist/dsh-launcher-${ARCH}-linux.zip" "${RELEASE_DIR}/dsh-launcher"
 
-          # Create .zip package
-          (cd dist && zip -r "${PKG_NAME}.zip" "${PKG_NAME}")
-          echo "Created dist/${PKG_NAME}.zip"
+          echo "== dist contents =="
+          ls -lh dist/
 
       - name: Create release packages (macOS)
         if: runner.os == 'macOS'
@@ -210,8 +225,11 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
+            src-tauri/dist/*.deb
+            src-tauri/dist/*.rpm
+            src-tauri/dist/*.AppImage
+            src-tauri/dist/*.pkg.tar.zst
             src-tauri/dist/*.zip
-            src-tauri/dist/*.tar.zst
 
       - name: Upload artifacts for manual release
         if: github.event_name == 'workflow_dispatch'
@@ -219,6 +237,9 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: |
+            src-tauri/dist/*.deb
+            src-tauri/dist/*.rpm
+            src-tauri/dist/*.AppImage
+            src-tauri/dist/*.pkg.tar.zst
             src-tauri/dist/*.zip
-            src-tauri/dist/*.tar.zst
           retention-days: 30

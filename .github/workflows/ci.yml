@@ -189,6 +189,12 @@ jobs:
             libpipewire-0.3-dev \
             xdg-utils
 
+      - name: Install packaging tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y ruby ruby-dev build-essential libarchive-tools zstd zip
+          sudo gem install --no-document fpm
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -204,23 +210,31 @@ jobs:
         run: |
           set -e
           RELEASE_DIR="target/${{ matrix.target }}/release"
-          PKG_NAME="dsh-launcher-${{ matrix.arch }}-linux"
-          mkdir -p "dist/${PKG_NAME}"
+          ARCH="${{ matrix.arch }}"
+          mkdir -p dist
 
-          # Copy binary
-          cp "${RELEASE_DIR}/dsh-launcher" "dist/${PKG_NAME}/"
+          # Native installers built by Tauri: .deb, .rpm, .AppImage
+          cp "${RELEASE_DIR}/bundle/deb/"*.deb           dist/ 2>/dev/null || true
+          cp "${RELEASE_DIR}/bundle/rpm/"*.rpm           dist/ 2>/dev/null || true
+          cp "${RELEASE_DIR}/bundle/appimage/"*.AppImage dist/ 2>/dev/null || true
 
-          # Create .tar.zst package (Arch Linux style)
-          if command -v zstd &> /dev/null; then
-            tar --zstd -cf "dist/${PKG_NAME}.tar.zst" -C "dist" "${PKG_NAME}"
-            echo "Created dist/${PKG_NAME}.tar.zst"
+          # Arch Linux package: convert Tauri's .deb into a real pacman .pkg.tar.zst.
+          DEB=$(ls "${RELEASE_DIR}/bundle/deb/"*.deb 2>/dev/null | head -1)
+          if [ -n "$DEB" ]; then
+            fpm -s deb -t pacman \
+              --no-auto-depends \
+              --depends webkit2gtk-4.1 \
+              --depends gtk3 \
+              --depends libayatana-appindicator \
+              --pacman-compression zstd \
+              -p dist/ "$DEB"
           fi
 
-          # Create .zip package
-          if command -v zip &> /dev/null; then
-            (cd dist && zip -r "${PKG_NAME}.zip" "${PKG_NAME}")
-            echo "Created dist/${PKG_NAME}.zip"
-          fi
+          # Raw binary (zipped)
+          zip -j "dist/dsh-launcher-${ARCH}-linux.zip" "${RELEASE_DIR}/dsh-launcher"
+
+          echo "== dist contents =="
+          ls -lh dist/
 
       - name: Create release packages (macOS)
         if: runner.os == 'macOS'
