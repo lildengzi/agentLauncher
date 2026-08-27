@@ -1,0 +1,79 @@
+<script setup lang="ts">
+import { ref, computed } from "vue";
+import { SendHorizonal, Square, Eraser } from "lucide-vue-next";
+import Dialog from "@/components/ui/Dialog.vue";
+import Button from "@/components/ui/Button.vue";
+import Input from "@/components/ui/Input.vue";
+import Avatar from "@/components/ui/Avatar.vue";
+import StatusDot from "@/components/ui/StatusDot.vue";
+import LogTerminal from "@/components/LogTerminal.vue";
+import { brandForModel } from "@/lib/brand";
+import { useI18n } from "@/lib/i18n";
+import type { Instance, RunStatus } from "@/types";
+
+const { t } = useI18n();
+const props = defineProps<{ instance: Instance | null; status: RunStatus }>();
+const emit = defineEmits<{ run: [task: string]; stop: [] }>();
+const open = defineModel<boolean>("open", { default: false });
+
+const task = ref("");
+const termRef = ref<InstanceType<typeof LogTerminal> | null>(null);
+
+const busy = computed(
+  () => props.status === "running" || props.status === "starting"
+);
+
+function runTask(): void {
+  if (busy.value) return;
+  emit("run", task.value);
+  task.value = "";
+}
+</script>
+
+<template>
+  <Dialog v-model:open="open" width="max-w-4xl" class="h-[80vh]">
+    <template #header>
+      <div class="flex items-center gap-2">
+        <Avatar v-if="instance" :seed="instance.id" :icon="instance.icon" :brand="brandForModel(instance.model)" :size="20" />
+        <span class="text-[15px] font-semibold text-foreground">
+          {{ instance?.name ?? t('console.title') }}
+        </span>
+        <span class="text-[12px] text-muted-foreground">· {{ t('console.title') }}</span>
+        <StatusDot :status="status" label class="ml-2" />
+      </div>
+    </template>
+
+    <div class="flex h-full flex-col">
+      <div class="min-h-0 flex-1 bg-[#0c0c0e]">
+        <LogTerminal
+          v-if="instance"
+          ref="termRef"
+          :instanceId="instance.id"
+          class="h-full"
+        />
+      </div>
+      <div class="flex items-center gap-2 border-t border-border bg-toolbar px-3 py-2">
+        <Input
+          v-model="task"
+          class="flex-1"
+          :placeholder="t('console.taskPlaceholder')"
+          @keydown.enter="runTask"
+        />
+        <Button v-if="busy" variant="destructive" @click="emit('stop')">
+          <Square class="h-4 w-4" /> {{ t('console.stop') }}
+        </Button>
+        <Button v-else variant="primary" @click="runTask">
+          <SendHorizonal class="h-4 w-4" /> {{ t('console.run') }}
+        </Button>
+      </div>
+    </div>
+
+    <template #footer>
+      <Button variant="ghost" size="sm" @click="termRef?.clear()">
+        <Eraser class="h-4 w-4" /> {{ t('console.clear') }}
+      </Button>
+      <div class="flex-1" />
+      <Button variant="outline" @click="open = false">{{ t('console.close') }}</Button>
+    </template>
+  </Dialog>
+</template>

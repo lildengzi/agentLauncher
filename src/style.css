@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Prism-Launcher-style dark theme.
+   Near-black Qt-desktop chrome: flat surfaces, thin 1px separators, tight
+   rhythm, blue desktop selection. No gradients, no soft shadows, no pills.
+   --------------------------------------------------------------------------- */
+@layer base {
+  :root {
+    --background: 240 6% 7%;        /* window / main content */
+    --panel: 240 6% 9%;             /* raised: group boxes, detail pane */
+    --toolbar: 240 5% 11%;          /* top bar + status bar */
+    --foreground: 220 12% 86%;
+    --card: 240 6% 9%;
+    --card-foreground: 220 12% 86%;
+
+    --muted: 240 5% 14%;
+    --muted-foreground: 220 6% 52%;
+    --accent: 240 5% 16%;           /* hover highlight */
+    --accent-foreground: 220 12% 92%;
+    --secondary: 240 5% 15%;
+    --secondary-foreground: 220 12% 88%;
+
+    /* desktop selection blues */
+    --selection: 216 52% 52%;       /* focused grid tile fill */
+    --selection-foreground: 210 40% 98%;
+    --selection-muted: 220 26% 26%; /* list-row highlight */
+    --link: 205 68% 64%;
+
+    --primary: 216 52% 52%;
+    --primary-foreground: 210 40% 98%;
+    --destructive: 0 60% 52%;
+    --destructive-foreground: 210 20% 96%;
+
+    --border: 240 5% 18%;
+    --border-strong: 240 5% 24%;
+    --input: 240 6% 12%;
+    --ring: 216 52% 52%;
+    --radius: 0.25rem;
+  }
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+::selection {
+  background: hsl(var(--selection) / 0.55);
+}
+
+/* thin Qt-like scrollbars */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border-strong));
+  border: 3px solid hsl(var(--background));
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(240 5% 32%);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* mnemonic underline used across toolbar / action buttons */
+.mnemonic {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
