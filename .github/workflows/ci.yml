@@ -99,8 +99,8 @@ jobs:
               target/release/bundle/deb/*.deb
               target/release/bundle/appimage/*.AppImage
               target/release/dsh-launcher
-          # Linux aarch64 (ARM64)
-          - os: ubuntu-latest
+          # Linux aarch64 (ARM64) — native arm64 runner (free for public repos)
+          - os: ubuntu-24.04-arm
             arch: aarch64
             target: aarch64-unknown-linux-gnu
             artifact_name: dsh-launcher-linux-aarch64
@@ -186,11 +186,7 @@ jobs:
             libudev-dev \
             libasound2-dev \
             libjack-jackd2-dev \
-            libpipewire-0.3-dev \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu
-        # Note: Cross-compilation for ARM64 requires docker or qemu-user
-        # This is a native build on ARM64 runner if available
+            libpipewire-0.3-dev
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -257,10 +253,10 @@ jobs:
           Copy-Item "${releaseDir}/dsh-launcher.exe" "dist/$pkgName/" -ErrorAction SilentlyContinue
 
           # Copy NSIS installer
-          Copy-Item "${releaseDir}/bundle/nsis/"*.exe "dist/$pkgName/" -ErrorAction SilentlyContinue
+          Copy-Item "${releaseDir}/bundle/nsis/*.exe" "dist/$pkgName/" -ErrorAction SilentlyContinue
 
           # Copy MSI
-          Copy-Item "${releaseDir}/bundle/msi/"*.msi "dist/$pkgName/" -ErrorAction SilentlyContinue
+          Copy-Item "${releaseDir}/bundle/msi/*.msi" "dist/$pkgName/" -ErrorAction SilentlyContinue
 
           # Create .zip
           Compress-Archive -Path "dist/$pkgName/*" -DestinationPath "dist/${pkgName}.zip" -Force
