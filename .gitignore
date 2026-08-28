@@ -2,3 +2,11 @@ target/
 node_modules/
 dist/
 
+# Claude Code's per-session scratch: `.claude/worktrees/` holds one checkout per
+# parallel agent, each with a `node_modules` symlink that `node_modules/` above
+# does not match (a trailing slash matches directories, not links). Ignoring the
+# directory itself is what keeps a stray `git add -A` from committing a worktree.
+# Only these two paths are ignored, so a shared `.claude/` config can still be
+# tracked later.
+.claude/worktrees/
+.claude/settings.local.json
