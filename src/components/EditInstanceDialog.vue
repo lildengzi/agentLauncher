@@ -215,7 +215,14 @@ async function loadExtensions(): Promise<void> {
   }
   extLoading.value = true;
   try {
-    extensions.value = await api.readInstanceExtensions(instanceId.value);
+    // Ask about the form as it stands, not as it was saved: the engine and
+    // profile pickers decide which plugin set is in scope, and a user who has
+    // just switched them is looking at the new one.
+    extensions.value = await api.readInstanceExtensions(
+      instanceId.value,
+      form.engine,
+      form.profile
+    );
   } catch (e) {
     extensions.value = null;
     console.error("read instance extensions failed", e);
@@ -230,10 +237,10 @@ watch(
   },
   { immediate: true }
 );
-// A profile switch changes which plugin set is in scope, so re-read on the spot
-// rather than showing the previous profile's list under the new name.
+// Both pickers change which plugin set is in scope, so re-read on the spot rather
+// than showing the previous selection's list under the new name.
 watch(
-  () => form.profile,
+  () => [form.engine, form.profile] as const,
   () => {
     if (open.value) void loadExtensions();
   }

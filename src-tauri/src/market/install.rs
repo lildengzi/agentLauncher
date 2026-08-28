@@ -74,7 +74,7 @@ fn add_mcp(instance_id: &str, entry: &McpServerEntry) -> Result<String, String> 
     if entry.name.trim().is_empty() || entry.command.trim().is_empty() {
         return Err("this item's MCP definition has no name or command".into());
     }
-    let mut servers = crate::instance_ext::read_instance_extensions(instance_id.to_string())?.mcp;
+    let mut servers = crate::instance_ext::read_mcp(instance_id)?;
     servers.retain(|s| s.name != entry.name);
     servers.push(entry.clone());
     crate::instance_ext::set_instance_mcp(instance_id.to_string(), servers)?;
@@ -145,8 +145,7 @@ pub async fn market_uninstall(
                 .as_ref()
                 .map(|m| m.name.clone())
                 .unwrap_or_else(|| name.clone());
-            let mut servers =
-                crate::instance_ext::read_instance_extensions(instance_id.clone())?.mcp;
+            let mut servers = crate::instance_ext::read_mcp(&instance_id)?;
             let before = servers.len();
             servers.retain(|s| s.name != target);
             if servers.len() == before {

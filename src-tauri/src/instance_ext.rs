@@ -101,7 +101,10 @@ fn mcp_path(id: &str) -> Result<PathBuf, String> {
     Ok(instance_manager::instance_dir(id)?.join("mcp.json"))
 }
 
-fn read_mcp(id: &str) -> Result<Vec<McpServerEntry>, String> {
+/// The instance's MCP servers alone. `pub(crate)` because the market's installer
+/// only ever wants this map: going through `read_instance_extensions` would make
+/// it shell out to dsh for a plugin list it then throws away.
+pub(crate) fn read_mcp(id: &str) -> Result<Vec<McpServerEntry>, String> {
     let path = mcp_path(id)?;
     let doc: McpDoc = match fs::read_to_string(&path) {
         Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
@@ -223,16 +226,26 @@ fn read_skills(id: &str) -> Result<Vec<SkillEntry>, String> {
 /// Everything the edit dialog's three extension sections show, in one call.
 /// A missing `skills/` dir or `mcp.json` is an empty list, never an error — the
 /// sections must render for an instance scaffolded by an older build too.
+///
+/// `engine` and `profile` override what the instance has on disk, because the
+/// dialog asks this question about the form the user is *looking at*: switching
+/// the profile picker changes which plugin set is in scope before anything is
+/// saved, and answering from the saved value would make that switch a no-op that
+/// still looks like an answer. Pass `None` for both to read the instance as saved.
 #[tauri::command]
-pub fn read_instance_extensions(id: String) -> Result<InstanceExtensions, String> {
+pub fn read_instance_extensions(
+    id: String,
+    engine: Option<String>,
+    profile: Option<String>,
+) -> Result<InstanceExtensions, String> {
     let inst = instance_manager::get_instance(&id)?;
+    let engine = engine.unwrap_or_else(|| inst.runtime.engine.clone());
     // Plugins are the engine's, and only dsh exposes a readable set today.
-    let (plugins, plugin_scope) = if inst.runtime.engine.is_empty() || inst.runtime.engine == "dsh" {
-        let profile = if inst.profile.is_empty() {
-            "headless".to_string()
-        } else {
-            inst.profile.clone()
-        };
+    let (plugins, plugin_scope) = if engine.is_empty() || engine == "dsh" {
+        let profile = profile
+            .filter(|p| !p.is_empty())
+            .or_else(|| Some(inst.profile.clone()).filter(|p| !p.is_empty()))
+            .unwrap_or_else(|| "headless".to_string());
         let found = crate::runtime::dsh_home::list_installed_plugins(profile.clone())
             .unwrap_or_default();
         (found, format!("dsh-profile:{profile}"))

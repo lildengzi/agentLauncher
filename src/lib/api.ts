@@ -43,9 +43,17 @@ export const api = {
   detectEngines: () => invoke<EngineInfo[]>("detect_engines"),
 
   // ---- per-instance extensions (edit dialog's three sections) -------------
-  /** Plugins + skills + MCP servers for one instance, in one round trip. */
-  readInstanceExtensions: (id: string) =>
-    invoke<InstanceExtensions>("read_instance_extensions", { id }),
+  /**
+   * Plugins + skills + MCP servers for one instance, in one round trip.
+   * `engine`/`profile` override the saved values so the edit dialog can ask about
+   * the form the user is looking at rather than the last thing written to disk.
+   */
+  readInstanceExtensions: (id: string, engine?: string, profile?: string) =>
+    invoke<InstanceExtensions>("read_instance_extensions", {
+      id,
+      engine: engine ?? null,
+      profile: profile ?? null,
+    }),
   /** Replace the whole `mcpServers` map of an instance's mcp.json. */
   setInstanceMcp: (id: string, servers: McpServerEntry[]) =>
     invoke<void>("set_instance_mcp", { id, servers }),
