@@ -30,8 +30,7 @@
 
 use tokio::process::Command;
 
-use super::{program, AgentRuntime, SpawnRequest};
-use crate::dsh_config;
+use super::{dsh_home, program, AgentRuntime, SpawnRequest};
 use crate::instance_manager::Instance;
 
 // ---------------------------------------------------------------- dsh
@@ -54,7 +53,7 @@ impl AgentRuntime for DshRuntime {
         if let Some(p) = &patch_path {
             cmd.arg("--patch").arg(p);
         }
-        if dsh_config::profile_is_web_capable(&req.instance.profile) {
+        if dsh_home::profile_is_web_capable(&req.instance.profile) {
             // Web profile: a long-running browser-UI server, not a one-shot task.
             // Pass no task; keep the launcher from hijacking the browser
             // (`--no-open` — the launcher opens the URL itself once it appears on
@@ -68,7 +67,7 @@ impl AgentRuntime for DshRuntime {
     }
 
     fn is_serve(&self, inst: &Instance) -> bool {
-        dsh_config::profile_is_web_capable(&inst.profile)
+        dsh_home::profile_is_web_capable(&inst.profile)
     }
 }
 

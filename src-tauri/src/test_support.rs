@@ -13,7 +13,7 @@ use std::sync::Mutex;
 /// Serializes every test that mutates `HOME`.
 pub(crate) static HOME_LOCK: Mutex<()> = Mutex::new(());
 
-/// Serializes every test that mutates `DSH_HOME` (read by dsh_config when
+/// Serializes every test that mutates `DSH_HOME` (read by `runtime::dsh_home` when
 /// deciding whether a profile is web-capable).
 pub(crate) static DSH_HOME_LOCK: Mutex<()> = Mutex::new(());
 

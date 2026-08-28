@@ -12,7 +12,13 @@
 //! adapters. All six live in `model.rs` — one file, one table — and
 //! `for_instance` dispatches on `instance.runtime.engine`; their contract is
 //! asserted row by row in `model_test.rs`.
+//!
+//! `dsh_home.rs` is the other half of being agent-specific: dsh's own `$DSH_HOME`
+//! installation (profiles, plugins, credential file). It lives here rather than at
+//! the top level because none of it generalises — the other five engines are
+//! configured through their own homes and the instance `.env`.
 
+pub mod dsh_home;
 pub mod env;
 mod model;
 #[cfg(test)]
@@ -107,8 +113,6 @@ pub(crate) fn test_instance(engine: &str, provider: &str, model: &str) -> Instan
         profile: "headless".into(),
         provider: provider.into(),
         model: model.into(),
-        temperature: 0.0,
-        thinking_budget: 0,
         default_task: String::new(),
         runtime: RuntimeConfig {
             engine: engine.into(),

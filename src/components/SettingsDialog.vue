@@ -28,8 +28,10 @@ const nav: { id: Section; icon: any; key: string }[] = [
 // Real dsh credential state: which key envs are already stored on disk.
 const storedKeys = ref<string[]>([]);
 const saveError = ref("");
+// No fallback env: with no provider chosen there is no credential name to write,
+// and defaulting to DEEPSEEK_API_KEY would file someone else's key under DeepSeek.
 const activeEnv = computed(
-  () => PROVIDERS.find((p) => p.id === modelConfig.provider)?.apiKeyEnv ?? "DEEPSEEK_API_KEY"
+  () => PROVIDERS.find((p) => p.id === modelConfig.provider)?.apiKeyEnv ?? ""
 );
 const keyStored = computed(() => storedKeys.value.includes(activeEnv.value));
 const providerOptions = computed<SelectOption[]>(() =>
@@ -53,6 +55,10 @@ async function onSaveModel(): Promise<void> {
   saveModelConfig();
   const key = modelConfig.apiKey.trim();
   if (key) {
+    if (!activeEnv.value) {
+      saveError.value = t("settings.model.noProvider");
+      return;
+    }
     try {
       await api.setCredential(activeEnv.value, key);
       modelConfig.apiKey = ""; // secret now lives in ~/.dsh/.credentials.yaml
@@ -74,7 +80,6 @@ function pickProvider(id: string): void {
   const p = PROVIDERS.find((x) => x.id === id);
   if (!p) return;
   modelConfig.provider = id;
-  if (p.baseUrl) modelConfig.baseUrl = p.baseUrl;
   if (p.models.length && !p.models.includes(modelConfig.defaultModel)) {
     modelConfig.defaultModel = p.models[0];
   }
@@ -168,16 +173,14 @@ function pickProvider(id: string): void {
                   class="font-mono"
                 />
                 <span class="inline-flex items-center gap-1 text-[11px]" :class="keyStored ? 'text-emerald-400' : 'text-muted-foreground'">
-                  <template v-if="keyStored">
+                  <template v-if="!activeEnv">{{ t('settings.model.noProvider') }}</template>
+                  <template v-else-if="keyStored">
                     <Check class="h-3 w-3 shrink-0" />
                     {{ activeEnv }} 已写入 ~/.dsh/.credentials.yaml（输入新值可覆盖）
                   </template>
                   <template v-else>将写入 dsh 凭据文件 {{ activeEnv }}</template>
                 </span>
               </div>
-
-              <label class="text-[13px] text-foreground/85">{{ t('settings.model.baseUrl') }}</label>
-              <Input v-model="modelConfig.baseUrl" placeholder="https://api.deepseek.com" />
 
               <label class="text-[13px] text-foreground/85">{{ t('settings.model.defaultModel') }}</label>
               <Input v-model="modelConfig.defaultModel" placeholder="deepseek-v4-flash" />

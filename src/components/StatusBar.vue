@@ -4,10 +4,10 @@ import { useI18n } from "@/lib/i18n";
 
 const { t } = useI18n();
 defineProps<{
-  engineVersion: string;
+  /** the launcher's own version — engines are per-instance, so no engine version here. */
+  appVersion: string;
   runningCount: number;
-  defaultModel: string;
-  contextLine?: string;
+  contextLine: string;
 }>();
 </script>
 
@@ -16,7 +16,7 @@ defineProps<{
     <div class="flex items-center gap-2 px-3 py-1">
       <Boxes class="h-3.5 w-3.5 opacity-80" />
       <span class="font-medium text-foreground/80">agentLauncher</span>
-      <span class="opacity-70">dsh Core Engine {{ engineVersion }}</span>
+      <span class="opacity-70">{{ appVersion }}</span>
       <div class="flex-1" />
       <span v-if="runningCount > 0" class="text-link">{{ t('status.runningN') }} {{ runningCount }}</span>
       <button class="flex items-center gap-1 hover:text-foreground">
@@ -25,7 +25,7 @@ defineProps<{
       </button>
     </div>
     <div class="border-t border-border/60 bg-background px-3 py-1 text-[11px]">
-      {{ contextLine ?? `${t('status.defaultModel')}：${defaultModel}` }}
+      {{ contextLine }}
     </div>
   </footer>
 </template>

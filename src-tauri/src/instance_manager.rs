@@ -41,6 +41,11 @@ impl Default for RuntimeConfig {
 }
 
 /// One Agent instance — mirrors `Instance` in src/types.ts.
+///
+/// Unknown keys are ignored, so a field retired from the contract keeps reading
+/// from older files without a `schema_version` bump: `temperature` /
+/// `thinking_budget` were dropped because no engine adapter ever consumed them
+/// (they were collected, persisted, and never passed to any CLI).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instance {
     #[serde(default = "default_schema_version")]
@@ -60,10 +65,6 @@ pub struct Instance {
     pub provider: String,
     #[serde(default)]
     pub model: String,
-    #[serde(default)]
-    pub temperature: f32,
-    #[serde(default)]
-    pub thinking_budget: u32,
     #[serde(default)]
     pub default_task: String,
     #[serde(default)]
@@ -87,10 +88,6 @@ pub struct NewInstance {
     pub provider: String,
     #[serde(default)]
     pub model: String,
-    #[serde(default)]
-    pub temperature: f32,
-    #[serde(default)]
-    pub thinking_budget: u32,
     #[serde(default)]
     pub default_task: String,
     #[serde(default)]
@@ -210,8 +207,6 @@ pub fn create_instance(payload: NewInstance) -> Result<Instance, String> {
         profile: payload.profile,
         provider: payload.provider,
         model: payload.model,
-        temperature: payload.temperature,
-        thinking_budget: payload.thinking_budget,
         default_task: payload.default_task,
         runtime: payload.runtime,
         created_at: Utc::now().to_rfc3339(),
@@ -226,7 +221,14 @@ pub fn create_instance(payload: NewInstance) -> Result<Instance, String> {
     );
     fs::write(dir.join("AGENTS.md"), agents_md).map_err(|e| e.to_string())?;
 
-    let env = "# 该实例专属的 API Keys 与环境变量\n# DEEPSEEK_API_KEY=\n";
+    // The instance `.env` is where *every* engine's credentials land (executor
+    // injects it into the child). It used to hint `DEEPSEEK_API_KEY` alone, which
+    // is doubly wrong: dsh keeps its keys in ~/.dsh/.credentials.yaml, and the
+    // other five engines each read their own variables — so point at the engine
+    // instead of naming one vendor's.
+    let env = "# 该实例专属的环境变量与 API Keys —— 启动时注入子进程，绝不回流到界面。\n\
+               # 按所选框架填写它自己读的变量（例如 claude 读 ANTHROPIC_API_KEY / ANTHROPIC_BASE_URL），\n\
+               # 变量名见该框架自己的文档；dsh 的凭据另存于 ~/.dsh/.credentials.yaml。\n";
     fs::write(dir.join(".env"), env).map_err(|e| e.to_string())?;
 
     fs::write(dir.join("mcp.json"), "{\n  \"servers\": {}\n}\n").map_err(|e| e.to_string())?;
@@ -270,8 +272,6 @@ mod tests {
             profile: "web".into(),
             provider: String::new(),
             model: String::new(),
-            temperature: 0.0,
-            thinking_budget: 0,
             default_task: String::new(),
             runtime: RuntimeConfig::default(),
         })
@@ -296,6 +296,13 @@ mod tests {
         assert!(
             agents.contains("agentlauncher"),
             "AGENTS.md should reference agentlauncher"
+        );
+        // The `.env` template is engine-agnostic: it must not preselect a vendor's
+        // key name, since every engine reads its own variables from this file.
+        let env = fs::read_to_string(dir.join(".env")).unwrap();
+        assert!(
+            !env.contains("DEEPSEEK_API_KEY"),
+            ".env template must not hardcode one vendor's key: {env}"
         );
         // Round-trips through the read path used by the UI.
         assert_eq!(get_instance(&inst.id).unwrap().id, inst.id);
@@ -344,5 +351,15 @@ mod tests {
         let json = r#"{"id":"x","name":"X","icon":"bot","group":"g","profile":"headless","created_at":"1970-01-01T00:00:00Z"}"#;
         let inst: Instance = serde_json::from_str(json).unwrap();
         assert!(inst.provider.is_empty());
+    }
+
+    /// `temperature` / `thinking_budget` were retired (no engine adapter ever read
+    /// them). An older file still carrying them must load, not error — retiring a
+    /// field is backward compatible because unknown keys are ignored.
+    #[test]
+    fn instance_with_retired_fields_still_loads() {
+        let json = r#"{"id":"x","name":"X","icon":"bot","group":"g","profile":"headless","model":"m","temperature":0.2,"thinking_budget":4096,"created_at":"1970-01-01T00:00:00Z"}"#;
+        let inst: Instance = serde_json::from_str(json).unwrap();
+        assert_eq!(inst.model, "m");
     }
 }

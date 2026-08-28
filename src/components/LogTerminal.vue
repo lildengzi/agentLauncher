@@ -2,7 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { onDshLog, onDshStatus } from "@/lib/api";
+import { onRuntimeLog, onRuntimeStatus } from "@/lib/api";
 import type { RunStatus } from "@/types";
 
 const props = defineProps<{ instanceId: string | null }>();
@@ -69,7 +69,7 @@ onMounted(async () => {
   term.open(host.value);
   fit();
 
-  unlistenLog.value = await onDshLog((e) => {
+  unlistenLog.value = await onRuntimeLog((e) => {
     if (!term || e.instanceId !== props.instanceId) return;
     if (e.stream === "stderr") {
       term.write("\x1b[31m" + e.chunk + "\x1b[0m");
@@ -78,7 +78,7 @@ onMounted(async () => {
     }
   });
 
-  unlistenStatus.value = await onDshStatus((e) => {
+  unlistenStatus.value = await onRuntimeStatus((e) => {
     if (!term || e.instanceId !== props.instanceId) return;
     const banner = statusBanner(e.status, e.code, e.message);
     if (banner) term.writeln(banner);

@@ -1,15 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
-  DshLogEvent,
   DshProfile,
-  DshStatusEvent,
   EngineInfo,
   InstGroups,
   Instance,
   LauncherConfig,
   McpPlugin,
   NewInstance,
+  RuntimeLogEvent,
+  RuntimeStatusEvent,
 } from "@/types";
 
 // ---- Tauri commands -------------------------------------------------------
@@ -30,7 +30,7 @@ export const api = {
   openInstanceFolder: (id: string) =>
     invoke<void>("open_instance_folder", { id }),
 
-  /** Open a URL (e.g. a web instance's dsh UI) in the default browser. */
+  /** Open a URL (e.g. a web instance's served UI) in the default browser. */
   openUrl: (url: string) => invoke<void>("open_url", { url }),
 
   listMcpCatalog: () => invoke<McpPlugin[]>("list_mcp_catalog"),
@@ -70,13 +70,17 @@ export const api = {
 };
 
 // ---- Events ---------------------------------------------------------------
+// Emitted by src-tauri/src/executor.rs for every engine — the executor is
+// agent-agnostic, so the events are named after the seam, not after dsh.
 
-export function onDshLog(cb: (e: DshLogEvent) => void): Promise<UnlistenFn> {
-  return listen<DshLogEvent>("dsh-log", (evt) => cb(evt.payload));
+export function onRuntimeLog(
+  cb: (e: RuntimeLogEvent) => void
+): Promise<UnlistenFn> {
+  return listen<RuntimeLogEvent>("runtime-log", (evt) => cb(evt.payload));
 }
 
-export function onDshStatus(
-  cb: (e: DshStatusEvent) => void
+export function onRuntimeStatus(
+  cb: (e: RuntimeStatusEvent) => void
 ): Promise<UnlistenFn> {
-  return listen<DshStatusEvent>("dsh-status", (evt) => cb(evt.payload));
+  return listen<RuntimeStatusEvent>("runtime-status", (evt) => cb(evt.payload));
 }

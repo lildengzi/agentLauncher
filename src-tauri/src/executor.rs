@@ -3,8 +3,9 @@
 //! Owns everything around a run that does not depend on which agent is launched:
 //! process spawn, streaming stdout/stderr to the frontend, the per-instance kill
 //! channel, and status events. The agent-specific command assembly is delegated
-//! to an `AgentRuntime` (see the `runtime` module). Event names (`dsh-status` /
-//! `dsh-log`) are the frontend contract and are intentionally left unchanged.
+//! to an `AgentRuntime` (see the `runtime` module). The events emitted here
+//! (`runtime-status` / `runtime-log`) carry every engine's output, so they are
+//! named after the seam rather than after dsh.
 
 use serde::Serialize;
 use std::collections::HashMap;
@@ -40,7 +41,7 @@ struct StatusEvent {
     status: String,
     code: Option<i32>,
     message: Option<String>,
-    /// For web (serve) runs: the dsh browser-UI URL once it appears on stdout.
+    /// For web (serve) runs: the served browser-UI URL once it appears on stdout.
     url: Option<String>,
 }
 
@@ -53,7 +54,7 @@ fn emit_status(
     url: Option<String>,
 ) {
     let _ = app.emit(
-        "dsh-status",
+        "runtime-status",
         StatusEvent {
             instance_id: id.to_string(),
             status: status.to_string(),
@@ -66,7 +67,7 @@ fn emit_status(
 
 fn emit_log(app: &AppHandle, id: &str, stream: &str, chunk: String) {
     let _ = app.emit(
-        "dsh-log",
+        "runtime-log",
         LogEvent {
             instance_id: id.to_string(),
             stream: stream.to_string(),
@@ -106,8 +107,8 @@ fn find_url(s: &str) -> Option<String> {
 
 /// Spawn a reader that streams a pipe to the frontend as chunks. When
 /// `detect_url` is set (the stdout of a web/serve run), it also scans for the
-/// dsh browser-UI URL, and on the first hit opens it in the default browser and
-/// re-emits a `running` status carrying the URL for the frontend.
+/// served browser-UI URL, and on the first hit opens it in the default browser
+/// and re-emits a `running` status carrying the URL for the frontend.
 fn spawn_reader<R>(app: AppHandle, id: String, stream: &'static str, reader: R, detect_url: bool)
 where
     R: tokio::io::AsyncRead + Unpin + Send + 'static,

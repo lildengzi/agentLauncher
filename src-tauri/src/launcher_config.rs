@@ -8,7 +8,8 @@
 //!     per-group collapsed state, and manual intra-group instance ordering.
 //!
 //! Both are backend-owned and mirrored in `src/types.ts`. Secrets never live
-//! here — credentials remain the runtime's domain (`~/.dsh/.credentials.yaml`).
+//! here — credentials remain each engine's own domain: dsh's in
+//! `~/.dsh/.credentials.yaml`, every other engine's in the instance `.env`.
 //!
 //! Robustness: a missing or malformed file yields built-in defaults rather than
 //! an error, so the launcher never bricks on a bad file. `instgroups.json` is an
@@ -56,38 +57,21 @@ impl Default for UiPrefs {
 }
 
 /// Launcher-wide agent defaults — prefill the New Instance dialog. Non-secret.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Both fields default to **empty**, which the engines read as "use your own
+/// default" (the same "空值即省略 flag" rule the adapters follow). A concrete
+/// vendor default here would be wrong for five of the six engines — and even for
+/// dsh, whose provider is `deepseek-official`, not `deepseek`.
+///
+/// Retired: `base_url` (never reached any engine — base URLs travel through the
+/// instance `.env`) and `profile` (a dsh-only knob with no UI, so never anything
+/// but its own default). Unknown keys are ignored, so older files still load.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentDefaults {
-    #[serde(default = "default_profile")]
-    pub profile: String,
-    #[serde(default = "default_provider")]
+    #[serde(default)]
     pub provider: String,
-    #[serde(default = "default_base_url")]
-    pub base_url: String,
-    #[serde(default = "default_model")]
+    #[serde(default)]
     pub model: String,
-}
-fn default_profile() -> String {
-    "headless".to_string()
-}
-fn default_provider() -> String {
-    "deepseek".to_string()
-}
-fn default_base_url() -> String {
-    "https://api.deepseek.com".to_string()
-}
-fn default_model() -> String {
-    "deepseek-reasoner".to_string()
-}
-impl Default for AgentDefaults {
-    fn default() -> Self {
-        Self {
-            profile: default_profile(),
-            provider: default_provider(),
-            base_url: default_base_url(),
-            model: default_model(),
-        }
-    }
 }
 
 /// Transient UX state restored across launches.
@@ -256,8 +240,9 @@ mod tests {
         assert_eq!(cfg.format_version, 1);
         assert_eq!(cfg.ui.theme, "catppuccin-mocha");
         assert_eq!(cfg.ui.locale, "zh");
-        assert_eq!(cfg.defaults.provider, "deepseek");
-        assert_eq!(cfg.defaults.base_url, "https://api.deepseek.com");
+        // No vendor default: empty ⇒ the chosen engine's own default.
+        assert!(cfg.defaults.provider.is_empty());
+        assert!(cfg.defaults.model.is_empty());
     }
 
     /// A partial doc fills every absent field from defaults (forward/backward
@@ -269,8 +254,24 @@ mod tests {
         let cfg: LauncherConfig = read_or_default(&p);
         assert_eq!(cfg.ui.theme, "light");
         assert_eq!(cfg.ui.locale, "zh"); // filled from default
-        assert_eq!(cfg.defaults.model, "deepseek-reasoner"); // whole section defaulted
+        assert!(cfg.defaults.model.is_empty()); // whole section defaulted
         assert_eq!(cfg.format_version, 1);
+        fs::remove_file(&p).ok();
+    }
+
+    /// `defaults.base_url` / `defaults.profile` were retired; a config.json still
+    /// carrying them must load and keep the fields that remain.
+    #[test]
+    fn config_with_retired_defaults_still_loads() {
+        let p = temp_path("retired");
+        fs::write(
+            &p,
+            r#"{"defaults":{"profile":"headless","provider":"p","base_url":"https://x","model":"m"}}"#,
+        )
+        .unwrap();
+        let cfg: LauncherConfig = read_or_default(&p);
+        assert_eq!(cfg.defaults.provider, "p");
+        assert_eq!(cfg.defaults.model, "m");
         fs::remove_file(&p).ok();
     }
 
@@ -288,8 +289,10 @@ mod tests {
     #[test]
     fn inst_groups_round_trips() {
         let p = temp_path("groups");
-        let mut g = InstGroups::default();
-        g.order = vec!["未分类".into(), "Web".into()];
+        let mut g = InstGroups {
+            order: vec!["未分类".into(), "Web".into()],
+            ..Default::default()
+        };
         g.groups.insert(
             "Web".into(),
             GroupState {

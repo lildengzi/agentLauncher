@@ -54,7 +54,7 @@
 
 ```text
 ~/.agentlauncher/instances/web-baseline/
-├─ instance.json   # 元数据：名称 · 图标 · 分组 · 模型 · temperature · thinking_budget
+├─ instance.json   # 元数据：名称 · 图标 · 分组 · 框架(engine) · provider · 模型
 ├─ AGENTS.md       # 该实例专属的 System Prompt 与行为守则
 ├─ mcp.json        # 启用的 MCP (Model Context Protocol) 插件配置
 ├─ .env            # 该实例专属的 API Keys 与环境变量（隔离注入）
@@ -67,7 +67,7 @@
 
 ### 🚀 快速开始
 
-**前置**：Rust 工具链 · Node + pnpm · [DeepSeek Harness (`dsh`) CLI](https://github.com/deepseek-ai)（需在 `PATH` 中，并配好 `DEEPSEEK_API_KEY`）。
+**前置**：Rust 工具链 · Node + pnpm · **至少装一个 Agent CLI 并在 `PATH` 中** —— `dsh` · `pi` · `omp` · `claude` · `codex` · `opencode` 任选。启动器实时探测它们（编辑 ▸ 运行时里能看到哪些已装、装在哪）；各引擎的 API Key 各读各的，写进该实例的 `.env` 即可（dsh 例外，它读 `~/.dsh/.credentials.yaml`）。
 
 ```bash
 pnpm install          # 安装前端依赖
@@ -75,9 +75,9 @@ pnpm tauri dev        # 开发模式，拉起桌面窗口
 pnpm tauri build      # 打包桌面应用
 ```
 
-1. **先装 dsh** —— 启动器只是外壳，真正干活的是 DeepSeek Harness。
-2. **新建实例** —— 点「添加实例」，选 web profile 与模型，实例文件夹在 `~/.agentlauncher/` 下生成。
-3. **启动并对话** —— 按「启动」，浏览器自动打开 dsh 网页；历史留在该实例的 `workspace/` 里。
+1. **先装至少一个引擎** —— 启动器只是外壳，真正干活的是你选的那个 CLI。
+2. **新建实例** —— 点「添加实例」，选一个框架（引擎）+ provider/模型，实例文件夹在 `~/.agentlauncher/` 下生成。
+3. **启动** —— 按「启动」：dsh 的 web profile 会自动开浏览器在它自己的页面里对话，其余组合跑一次性任务并流式打日志；历史留在该实例的 `workspace/` 里。
 
 > 📄 仓库内附带一份可直接用 GitHub Pages 托管的落地页：[`docs/landing.html`](docs/landing.html)。
 
@@ -96,7 +96,7 @@ flowchart LR
 ```
 
 - **运行形态由 引擎 + profile 推导**：仅 `dsh` 的 web 能力 profile（`bundles` 含 `@deepseek-ai/dsh-web-app`）会起 web 服务、抓端口、开浏览器；其余全部跑一次性任务（`-p` / `exec` / `run` 因引擎而异，见[实例解剖](docs/wiki/Instance-Anatomy.md#自由组合--框架--llm)矩阵）。
-- **前后端契约**：`src/types.ts` 镜像 Rust 结构体，`src/lib/api.ts` 封装所有 `invoke` 命令与 `dsh-log` / `dsh-status` 事件。
+- **前后端契约**：`src/types.ts` 镜像 Rust 结构体，`src/lib/api.ts` 封装所有 `invoke` 命令与 `runtime-log` / `runtime-status` 事件。
 
 ### 🗺 路线图
 

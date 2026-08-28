@@ -7,7 +7,8 @@
 // to disk (debounced). theme.ts / i18n.ts / settings.ts bind their editable
 // surfaces to slices of this object rather than to localStorage.
 //
-// Secrets never enter this file — API keys stay in ~/.dsh/.credentials.yaml.
+// Secrets never enter this file — dsh's keys live in ~/.dsh/.credentials.yaml,
+// every other engine's in the instance .env.
 import { reactive, watch } from "vue";
 import { api } from "@/lib/api";
 import type { LauncherConfig } from "@/types";
@@ -16,12 +17,10 @@ export function defaultConfig(): LauncherConfig {
   return {
     format_version: 1,
     ui: { theme: "catppuccin-mocha", locale: "zh" },
-    defaults: {
-      profile: "headless",
-      provider: "deepseek",
-      base_url: "https://api.deepseek.com",
-      model: "deepseek-reasoner",
-    },
+    // Empty defaults = "let the chosen engine use its own"; see AgentDefaults in
+    // src-tauri/src/launcher_config.rs. Must match the backend's defaults, since
+    // this object is what a first run persists.
+    defaults: { provider: "", model: "" },
     session: { selected_instance: "", last_used_group: "" },
   };
 }
@@ -62,7 +61,6 @@ function migrateFromLocalStorage(): void {
     if (raw) {
       const m = JSON.parse(raw);
       if (m.provider) config.defaults.provider = m.provider;
-      if (m.baseUrl) config.defaults.base_url = m.baseUrl;
       if (m.defaultModel) config.defaults.model = m.defaultModel;
     }
     localStorage.setItem(MIGRATED, "1");

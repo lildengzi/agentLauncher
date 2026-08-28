@@ -30,8 +30,6 @@
   "profile": "web",
   "provider": "",
   "model": "deepseek-v4-flash",
-  "temperature": 0.2,
-  "thinking_budget": 4096,
   "runtime": { "engine": "dsh", "env_policy": "autodetect", "custom_bin": "" },
   "default_task": "",
   "created_at": "2026-08-27T08:41:05+00:00"
@@ -39,6 +37,8 @@
 ```
 
 > `schema_version` 标记该文件的契约版本（缺失视为 `1`，向后兼容）。启动器级的契约见 [Launcher Anatomy](Launcher-Anatomy)。
+>
+> **已退役字段**：`temperature` / `thinking_budget` 曾被收集并落盘，但**没有任何框架 adapter 读过它们**——违反本项目「字段与消费者同时落地」的规矩，故删除而非补线。旧 `instance.json` 仍带着它们也能正常读取（未知键被忽略），因此**无需 `schema_version` 升版**。
 
 #### 自由组合 · 框架 × LLM
 一个实例 = 任选一个**框架**（`runtime.engine`，即哪个 Agent CLI）× 任选一个 **LLM**（顶层 `provider` + `model`）。二者正交、自由搭配：

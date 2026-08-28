@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Shared front/back contract. Mirrors the Rust structs in
-// src-tauri/src/instance_manager.rs and the events emitted by dsh_runner.rs.
+// src-tauri/src/instance_manager.rs and the events emitted by executor.rs.
 // Keep this file and the Rust side in sync.
 // ---------------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ export interface EngineInfo {
   path: string;
 }
 
-/** One dsh profile — mirrors `DshProfile` in src-tauri/src/dsh_config.rs.
+/** One dsh profile — mirrors `DshProfile` in src-tauri/src/runtime/dsh_home.rs.
  *  `web` is resolved by the backend from the profile's bundled packages, never
  *  guessed from the name. */
 export interface DshProfile {
@@ -40,7 +40,11 @@ export interface DshProfile {
   web: boolean;
 }
 
-/** An Agent instance — one isolated dsh profile + workspace. */
+/** An Agent instance — one agent CLI + workspace, isolated in its own directory.
+ *
+ *  Retired fields (`temperature`, `thinking_budget`) are simply absent: no engine
+ *  adapter ever passed them to a CLI. Older `instance.json` files still carrying
+ *  them load fine — the backend ignores unknown keys, so no schema bump. */
 export interface Instance {
   /** on-disk contract version for instance.json (missing ⇒ 1). */
   schema_version: number;
@@ -57,8 +61,6 @@ export interface Instance {
   provider: string;
   /** underlying model target, e.g. "deepseek-reasoner". */
   model: string;
-  temperature: number;
-  thinking_budget: number;
   /** default task text prefilled when launching. */
   default_task: string;
   /** runtime/environment override (missing ⇒ autodetect, no custom binary). */
@@ -76,28 +78,26 @@ export interface NewInstance {
   profile: string;
   provider: string;
   model: string;
-  temperature: number;
-  thinking_budget: number;
   default_task: string;
   runtime: RuntimeConfig;
 }
 
 export type RunStatus = "idle" | "starting" | "running" | "exited" | "error";
 
-/** dsh-status event payload. */
-export interface DshStatusEvent {
+/** `runtime-status` event payload (every engine, not just dsh). */
+export interface RuntimeStatusEvent {
   instanceId: string;
   status: RunStatus;
   /** process exit code, present on "exited". */
   code?: number | null;
   /** human-readable message, present on "error". */
   message?: string | null;
-  /** dsh web-UI URL, present on the "running" event of a web (serve) instance. */
+  /** served web-UI URL, present on the "running" event of a web (serve) instance. */
   url?: string | null;
 }
 
-/** dsh-log event payload — a raw chunk to feed straight into xterm. */
-export interface DshLogEvent {
+/** `runtime-log` event payload — a raw chunk to feed straight into xterm. */
+export interface RuntimeLogEvent {
   instanceId: string;
   stream: "stdout" | "stderr";
   chunk: string;
@@ -124,7 +124,8 @@ export interface McpPlugin {
 // Two backend-owned versioned files under ~/.agentlauncher/:
 //   config.json      → LauncherConfig
 //   instgroups.json  → InstGroups   (a presentation overlay, not source of truth)
-// Secrets never live here — credentials stay in ~/.dsh/.credentials.yaml.
+// Secrets never live here — dsh's credentials stay in ~/.dsh/.credentials.yaml,
+// every other engine's in the instance `.env`.
 // ---------------------------------------------------------------------------
 
 /** UI preferences (was localStorage: agentlauncher.{theme,locale}). */
@@ -133,11 +134,12 @@ export interface UiPrefs {
   locale: string;
 }
 
-/** Launcher-wide agent defaults — prefill the New Instance dialog. Non-secret. */
+/** Launcher-wide agent defaults — prefill the New Instance dialog. Non-secret.
+ *  Both default to empty: an empty value means "let the chosen engine use its
+ *  own default", since provider naming differs per engine. `base_url` and
+ *  `profile` were retired (no consumer / dsh-only with no UI). */
 export interface AgentDefaults {
-  profile: string;
   provider: string;
-  base_url: string;
   model: string;
 }
 

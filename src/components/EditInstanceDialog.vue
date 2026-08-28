@@ -74,8 +74,6 @@ interface FormState {
   profile: string;
   provider: string;
   model: string;
-  temperature: number | string;
-  thinking_budget: number | string;
   env_policy: string;
   custom_bin: string;
   default_task: string;
@@ -89,13 +87,11 @@ function defaults(): FormState {
     group: config.session.last_used_group || "未分类",
     description: "",
     engine: "dsh",
-    profile: config.defaults.profile || "headless",
+    profile: "headless",
     provider: config.defaults.provider || "",
     // Empty = the selected framework's own default (see "空值即省略" contract).
     // The launcher-wide default is owned by config.defaults, not hardcoded here.
     model: config.defaults.model || "",
-    temperature: 0.2,
-    thinking_budget: 4096,
     env_policy: "autodetect",
     custom_bin: "",
     default_task: "",
@@ -123,8 +119,6 @@ watch(
       form.profile = props.instance.profile;
       form.provider = props.instance.provider || "";
       form.model = props.instance.model;
-      form.temperature = props.instance.temperature;
-      form.thinking_budget = props.instance.thinking_budget;
       form.env_policy = props.instance.runtime?.env_policy || "autodetect";
       form.custom_bin = props.instance.runtime?.custom_bin || "";
       form.default_task = props.instance.default_task;
@@ -153,8 +147,6 @@ async function save() {
     profile: form.profile,
     provider: form.provider.trim(),
     model: form.model,
-    temperature: Number(form.temperature),
-    thinking_budget: Number(form.thinking_budget),
     runtime: {
       engine: form.engine,
       env_policy: form.env_policy,
@@ -331,19 +323,6 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
 
             <Label for="inst-model">{{ t("edit.model") }}</Label>
             <Input id="inst-model" v-model="form.model" />
-
-            <Label for="inst-temp">{{ t("edit.temperature") }}</Label>
-            <Input
-              id="inst-temp"
-              v-model="form.temperature"
-              type="number"
-              step="0.1"
-              min="0"
-              max="2"
-            />
-
-            <Label for="inst-budget">{{ t("edit.thinking") }}</Label>
-            <Input id="inst-budget" v-model="form.thinking_budget" type="number" />
           </div>
         </GroupBox>
 

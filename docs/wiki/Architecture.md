@@ -14,7 +14,7 @@ flowchart LR
   EX -- "spawn + .env + cwd=workspace" --> CLI["选中的 Agent CLI 子进程"]
   CLI -- "web (仅 dsh)" --> Web["dsh 网页 UI"]
   CLI -- headless --> Task["一次性任务"]
-  CLI -- "stdout/stderr" --> Log["dsh-log / dsh-status 事件 → 只读日志页"]
+  CLI -- "stdout/stderr" --> Log["runtime-log / runtime-status 事件 → 只读日志页"]
 ```
 
 ## 职责边界 · The one seam
@@ -31,21 +31,23 @@ flowchart LR
 |---|---|
 | `src-tauri/src/instance_manager.rs` | 遍历 / 读写 `~/.agentlauncher/instances/`，返回卡片数据 |
 | `src-tauri/src/launcher_config.rs` | 启动器契约：`config.json` / `instgroups.json` 的读写命令，缺失即回退默认 |
-| `src-tauri/src/dsh_config.rs` | 解析 profile；`profile_is_web_capable()` 供 `DshRuntime::is_serve` 判断运行形态 |
 | `src-tauri/src/engines.rs` | 引擎注册表 `known_engines()` + `detect_engines` 实时探测宿主已装 CLI（不缓存） |
 | `src-tauri/src/runtime/mod.rs` | `AgentRuntime` trait + `for_instance` 按 `runtime.engine` 分发 |
 | `src-tauri/src/runtime/model.rs` | 六个引擎适配器**同一个文件**：`dsh`（含 `is_serve` 按 profile 判 web、写 `model.patch.yml`）+ `pi`/`omp`/`claude`/`codex`/`opencode` 的 headless 命令行组装（见 [Instance Anatomy](Instance-Anatomy#自由组合--框架--llm) 矩阵）；均支持 `custom_bin` 覆盖 |
 | `src-tauri/src/runtime/env.rs` | 按实例 `runtime.env_policy` 解析子进程 PATH（autodetect 探登录 shell / isolated 最小化），宿主无关 |
+| `src-tauri/src/runtime/dsh_home.rs` | `$DSH_HOME`（默认 `~/.dsh`）里 dsh 自己的安装：profile 列表与 `profile_is_web_capable()`（供 `is_serve` 判运行形态）、`.credentials.yaml` 读写（只回名不回值）、`dsh plugin add/remove`。**只属于 dsh，故落在 `runtime/` 而非与 `launcher_config.rs` 并列**——其余五个引擎的配置各在自己家、经实例 `.env` 抵达 |
 | `src-tauri/src/runtime/model_test.rs` | 「框架 × LLM」测试总表：六引擎 argv 矩阵、分发、真实建实例回读再组命令、已装引擎 `--version` 存活探测 |
 | `src-tauri/src/test_support.rs` | 仅 `cfg(test)`：跨模块共享的 `HOME` / `DSH_HOME` 锁与临时目录、env 守卫 |
 | `src-tauri/src/executor.rs` | spawn / 流式 / kill；spawn 前设子进程 PATH；扫描 stdout 里的 URL 并用 opener 打开 |
 | `src/types.ts` | 镜像 Rust 结构体的前端类型 |
-| `src/lib/api.ts` | 封装所有 `invoke` 命令与 `dsh-log` / `dsh-status` 事件 |
+| `src/lib/api.ts` | 封装所有 `invoke` 命令与 `runtime-log` / `runtime-status` 事件 |
 
 ## 运行时事件 · Events
 
-- **`dsh-log`**：子进程 stdout/stderr 逐行流式推送，喂给只读日志页。
-- **`dsh-status`**：状态变化（`running` / `exited` / `error`）；web 实例在 `running` 时携带抓到的 `url`。
+事件按**接缝**命名而非按 dsh 命名——executor 与具体 Agent 无关，六个引擎的输出都走这两个事件：
+
+- **`runtime-log`**：子进程 stdout/stderr 逐行流式推送，喂给只读日志页。
+- **`runtime-status`**：状态变化（`running` / `exited` / `error`）；`dsh` web 实例在 `running` 时携带抓到的 `url`。
 
 ## 前后端契约 · Contract
 
@@ -54,4 +56,4 @@ flowchart LR
 - **实例契约**（`instance_manager.rs` ↔ `Instance`）：每个 Agent 一个目录，`instance.json` 带 `schema_version`。见 [Instance Anatomy](Instance-Anatomy)。
 - **启动器契约**（`launcher_config.rs` ↔ `LauncherConfig` / `InstGroups`）：启动器自身的 UI 偏好、全局默认值、会话状态、侧栏分组，落在 `~/.agentlauncher/{config.json, instgroups.json}`，各带 `format_version`。见 [Launcher Anatomy](Launcher-Anatomy)。
 
-> 密钥不属于任何契约文件——凭据只归运行时 `~/.dsh/.credentials.yaml`。
+> 密钥不属于任何契约文件——凭据走各引擎自身的 env（`dsh` 的 `~/.dsh/.credentials.yaml` 为其一），统一通过实例 `.env` 注入。

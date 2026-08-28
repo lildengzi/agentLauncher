@@ -399,8 +399,6 @@ fn create_instance_per_engine_then_build_from_disk() {
             profile: "headless".into(),
             provider: provider.into(),
             model: model.into(),
-            temperature: 0.2,
-            thinking_budget: 4096,
             default_task: String::new(),
             runtime: RuntimeConfig {
                 engine: spec.id.into(),

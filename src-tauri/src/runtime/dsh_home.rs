@@ -1,22 +1,32 @@
-// Real dsh (DeepSeek Harness) configuration wiring.
-//
-// dsh has no `config`/`model`/`market` subcommands; its configuration lives in
-// files under $DSH_HOME (default ~/.dsh):
-//   * `.credentials.yaml` — a flat `KEY: value` mapping (mode 0600) of credential
-//     references (e.g. DEEPSEEK_API_KEY) to secret values.
-//   * `profiles/<name>/`   — one profile per dir; `cordis.patch.yml` is the user
-//     patch layer and `package.json` `dependencies` are the installed plugins.
-// The default agent model is the `agent-default-model` plugin's `{provider, model}`
-// config, overridable per run via `--patch <file>` (see dsh_runner).
-//
-// Plugins are managed with `dsh plugin --profile <name> add|remove <pkg>`, which
-// forwards to pnpm inside the profile directory. There is no remote plugin market.
+//! Everything the launcher reads or writes inside `$DSH_HOME` (default `~/.dsh`).
+//!
+//! This is dsh's *own installation*, not a launcher-level concern — hence its home
+//! under `runtime/`, beside the engine adapters. At the top level, next to
+//! `launcher_config.rs`, it would read as that module's peer: one of two config
+//! modules, as if every engine had one here. None of this applies to the other
+//! five — they keep credentials and settings in their own homes, reached through
+//! the instance `.env`.
+//!
+//! dsh has no `config`/`model`/`market` subcommands; its state is files:
+//!   * `.credentials.yaml` — a flat `KEY: value` mapping (mode 0600) of credential
+//!     references (e.g. DEEPSEEK_API_KEY) to secret values.
+//!   * `profiles/<name>/`   — one profile per dir; `cordis.patch.yml` is the user
+//!     patch layer and `package.json` `dependencies` are the installed plugins.
+//!
+//! The default agent model is the `agent-default-model` plugin's `{provider, model}`
+//! config, overridable per run via `--patch <file>` (written by `model.rs`).
+//!
+//! Plugins are managed with `dsh plugin --profile <name> add|remove <pkg>`, which
+//! forwards to pnpm inside the profile directory. There is no remote plugin market.
+//!
+//! Secret *values* stay on disk: `list_credential_keys` hands the UI names only.
 
 use std::fs;
 use std::path::PathBuf;
 
-/// `$DSH_HOME` or `~/.dsh`.
-pub fn dsh_home() -> Result<PathBuf, String> {
+/// `$DSH_HOME` or `~/.dsh`. Private: outside this module the dsh home is only ever
+/// reached through the functions below, never assembled by hand.
+fn root() -> Result<PathBuf, String> {
     if let Ok(h) = std::env::var("DSH_HOME") {
         if !h.trim().is_empty() {
             return Ok(PathBuf::from(h));
@@ -27,7 +37,7 @@ pub fn dsh_home() -> Result<PathBuf, String> {
 }
 
 fn credentials_path() -> Result<PathBuf, String> {
-    Ok(dsh_home()?.join(".credentials.yaml"))
+    Ok(root()?.join(".credentials.yaml"))
 }
 
 fn is_posix_identifier(k: &str) -> bool {
@@ -83,7 +93,7 @@ pub fn set_credential(key: String, value: String) -> Result<(), String> {
     }
     let value = value.trim().to_string();
 
-    let home = dsh_home()?;
+    let home = root()?;
     let path = home.join(".credentials.yaml");
     let existing = fs::read_to_string(&path).unwrap_or_default();
 
@@ -143,7 +153,7 @@ pub struct DshProfile {
 /// web capability resolved.
 #[tauri::command]
 pub fn list_dsh_profiles() -> Result<Vec<DshProfile>, String> {
-    let dir = dsh_home()?.join("profiles");
+    let dir = root()?.join("profiles");
     if !dir.exists() {
         return Ok(vec![]);
     }
@@ -178,7 +188,7 @@ fn profile_dir(profile: &str) -> Result<PathBuf, String> {
     {
         return Err(format!("非法 profile 名: {profile}"));
     }
-    Ok(dsh_home()?.join("profiles").join(profile))
+    Ok(root()?.join("profiles").join(profile))
 }
 
 /// True when the profile boots dsh's browser-UI server rather than answering a

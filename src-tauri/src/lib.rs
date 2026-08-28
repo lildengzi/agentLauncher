@@ -1,4 +1,3 @@
-mod dsh_config;
 mod engines;
 mod executor;
 mod instance_manager;
@@ -67,9 +66,10 @@ fn open_instance_folder(app: AppHandle, id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Open a URL in the default browser (e.g. the dsh web-UI URL surfaced when a
-/// web instance starts). The launcher hosts no agent UI of its own — interaction
-/// happens in dsh's own web page.
+/// Open a URL in the default browser (e.g. the web-UI URL an engine prints when a
+/// serve-mode instance starts; dsh is the only one wired for that today). The
+/// launcher hosts no agent UI of its own — interaction happens in the engine's own
+/// page, and the launcher's log view stays read-only.
 #[tauri::command]
 fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     app.opener()
@@ -79,7 +79,8 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
 
 /// Curated plugin catalog for the Hub. dsh has no remote plugin market, so
 /// discovery is a curated list; entries carrying a real `package` (npm name) can
-/// be installed/removed for real via `dsh plugin add|remove` (see dsh_config).
+/// be installed/removed for real via `dsh plugin add|remove` (see
+/// `runtime::dsh_home`).
 /// The frontend cross-references `list_installed_plugins` for live installed state.
 #[tauri::command]
 fn list_mcp_catalog() -> serde_json::Value {
@@ -164,12 +165,12 @@ pub fn run() {
             open_url,
             list_mcp_catalog,
             engines::detect_engines,
-            dsh_config::list_credential_keys,
-            dsh_config::set_credential,
-            dsh_config::list_dsh_profiles,
-            dsh_config::list_installed_plugins,
-            dsh_config::plugin_add,
-            dsh_config::plugin_remove,
+            runtime::dsh_home::list_credential_keys,
+            runtime::dsh_home::set_credential,
+            runtime::dsh_home::list_dsh_profiles,
+            runtime::dsh_home::list_installed_plugins,
+            runtime::dsh_home::plugin_add,
+            runtime::dsh_home::plugin_remove,
             launcher_config::get_launcher_config,
             launcher_config::set_launcher_config,
             launcher_config::get_inst_groups,

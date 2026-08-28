@@ -65,7 +65,7 @@ One agent = one directory. No hidden global state — open the folder and you se
 
 ### 🚀 Quick start
 
-**Prereqs**: Rust toolchain · Node + pnpm · the [DeepSeek Harness (`dsh`) CLI](https://github.com/deepseek-ai) (on your `PATH`, with `DEEPSEEK_API_KEY` set).
+**Prereqs**: Rust toolchain · Node + pnpm · **at least one agent CLI on your `PATH`** — any of `dsh` · `pi` · `omp` · `claude` · `codex` · `opencode`. The launcher probes them live (Edit ▸ Runtime shows which are installed and where); each engine reads its own API key, so put it in the instance's `.env` (dsh reads `~/.dsh/.credentials.yaml` instead).
 
 ```bash
 pnpm install          # install frontend deps
@@ -73,9 +73,9 @@ pnpm tauri dev        # dev mode, opens the desktop window
 pnpm tauri build      # bundle the desktop app
 ```
 
-1. **Install dsh first** — the launcher is only a shell; DeepSeek Harness does the work.
-2. **Create an instance** — hit *Add instance*, pick the web profile and a model; the folder is created under `~/.agentlauncher/`.
-3. **Launch & chat** — press *Launch*; the browser opens dsh's web page. History stays in the instance's `workspace/`.
+1. **Install at least one engine** — the launcher is only a shell; the CLI you pick does the work.
+2. **Create an instance** — hit *Add instance*, pick a framework (engine) plus a provider/model; the folder is created under `~/.agentlauncher/`.
+3. **Launch** — press *Launch*. A dsh web profile opens the browser on its own page; every other combination runs a one-shot task and streams its log. History stays in the instance's `workspace/`.
 
 > 📄 A GitHub-Pages-ready landing page ships in the repo: [`docs/landing.html`](docs/landing.html).
 
@@ -84,7 +84,7 @@ pnpm tauri build      # bundle the desktop app
 A light shell that runs **any of six agent CLIs**. **Tauri 2 (Rust)** manages subprocesses, the file sandbox and credentials; the six `AgentRuntime` adapters — `dsh` · `pi` · `omp` · `claude` · `codex` · `opencode` — all live in `src-tauri/src/runtime/model.rs:1` and are dispatched by `runtime::for_instance` (`src-tauri/src/runtime/mod.rs:71`). `dsh` is the only engine with a web serve mode; the other five run as headless one-shots.
 
 - **Run shape is derived from the engine + profile**: `dsh` web-capable profiles (bundles include `@deepseek-ai/dsh-web-app`) start a server, grab a port and open the browser; everything else runs a one-shot task (`-p` / `exec` / `run` depending on the engine, see [Instance Anatomy](docs/wiki/Instance-Anatomy.md#自由组合--框架--llm)).
-- **Front/back contract**: `src/types.ts` mirrors the Rust structs; `src/lib/api.ts` wraps every `invoke` command and the `dsh-log` / `dsh-status` events.
+- **Front/back contract**: `src/types.ts` mirrors the Rust structs; `src/lib/api.ts` wraps every `invoke` command and the `runtime-log` / `runtime-status` events.
 
 ### 🙏 Acknowledgements
 

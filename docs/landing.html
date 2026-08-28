@@ -246,12 +246,12 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
     <div>
       <div class="eyebrow"><span class="lang-zh">PRISM 式 · AI AGENT 启动器</span><span class="lang-en">PRISM-STYLE · AGENT LAUNCHER</span></div>
       <h1 style="margin-top:18px">
-        <span class="lang-zh">一个引擎，<br><span class="spec">一整排</span>专属 Agent。</span>
-        <span class="lang-en">One engine,<br>a whole <span class="spec">shelf</span> of agents.</span>
+        <span class="lang-zh">六个引擎，<br><span class="spec">一整排</span>专属 Agent。</span>
+        <span class="lang-en">Six engines,<br>a whole <span class="spec">shelf</span> of agents.</span>
       </h1>
       <p class="lede">
-        <span class="lang-zh">像 Prism Launcher 管理 Minecraft 实例那样，管理你的 AI Agent —— 每个实例独立沙箱、独立模型、独立插件与密钥，一键启动到 dsh 自己的网页里对话。</span>
-        <span class="lang-en">Manage AI agents the way Prism Launcher manages Minecraft instances — every instance its own sandbox, model, plugins and keys, launched straight into dsh's own web UI.</span>
+        <span class="lang-zh">像 Prism Launcher 管理 Minecraft 实例那样，管理你的 AI Agent —— 每个实例任选一个引擎（<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>）、独立沙箱、独立模型与密钥，一键启动。</span>
+        <span class="lang-en">Manage AI agents the way Prism Launcher manages Minecraft instances — each instance picks one of six engines (<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>), its own sandbox, model and keys — one click to launch.</span>
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#start"><span class="lang-zh">快速上手</span><span class="lang-en">Get started</span> →</a>
@@ -273,8 +273,8 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
       <div class="l"><span class="lang-zh">本地优先 · 密钥留在你机器上（<span class="mono">.env</span> 每实例隔离，0600 凭据）</span><span class="lang-en">Local-first · keys stay on your machine (per-instance <span class="mono">.env</span>, 0600 credentials)</span></div>
     </div>
     <div class="strip-cell">
-      <div class="k" style="color:var(--live)"><span class="lang-zh">零内置 UI</span><span class="lang-en">Zero built-in UI</span></div>
-      <div class="l"><span class="lang-zh">只管理，不插手对话 —— 交互发生在 dsh 自己的网页</span><span class="lang-en">A manager, not a client — chat happens in dsh's own web page</span></div>
+      <div class="k" style="color:var(--live)"><span class="lang-zh">通用启动器</span><span class="lang-en">Universal launcher</span></div>
+      <div class="l"><span class="lang-zh">只管理，不抢对话 —— <span class="mono">dsh</span> 走网页，其余引擎走 headless 一次性任务</span><span class="lang-en">A manager, not a client — <span class="mono">dsh</span> via web UI, the other five via headless one-shots</span></div>
     </div>
   </div>
 </section>
@@ -293,7 +293,7 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
         <span class="shot-title">agentLauncher — <span class="lang-zh">实例面板</span><span class="lang-en">instances</span></span>
       </div>
       <img class="shot-img" src="images/mainPage.png" alt="agentLauncher 实例面板 / dashboard" loading="lazy">
-      <div class="shot-status"><span class="live-dot"></span><span class="lang-zh">运行中 · dsh web</span><span class="lang-en">running · dsh web</span> → http://127.0.0.1</div>
+      <div class="shot-status"><span class="live-dot"></span><span class="lang-zh">运行中 · 已启动</span><span class="lang-en">running · launched</span> → http://127.0.0.1</div>
     </div>
     <p class="figcap"><span class="lang-zh">真实界面 · 网格卡片 / 右侧操作面板 / 状态栏</span><span class="lang-en">Real UI · grid cards / action panel / status bar</span></p>
   </div>
@@ -324,8 +324,8 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
       </div>
       <div class="fcard reveal">
         <div class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg></div>
-        <h3><span class="lang-zh">一键启动到网页</span><span class="lang-en">Launch to the web UI</span></h3>
-        <p><span class="lang-zh">Web 实例自动起服务、抓端口、开浏览器，你在 dsh 自己的页面里对话。</span><span class="lang-en">Web instances auto-start the server, grab a port and open the browser — you chat in dsh's own page.</span></p>
+        <h3><span class="lang-zh">一键启动</span><span class="lang-en">One-click launch</span></h3>
+        <p><span class="lang-zh"><span class="mono">dsh</span> 的 web 实例自动起服务、抓端口、开浏览器；其余引擎以 headless 一次性任务运行，日志流式回显。</span><span class="lang-en"><span class="mono">dsh</span> web instances auto-start a server, grab a port and open the browser; the other engines run as headless one-shots with streaming logs.</span></p>
       </div>
       <div class="fcard reveal">
         <div class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div>
@@ -376,7 +376,7 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
 └─ <span class="d">logs/</span>          <span class="c"># <span class="lang-zh">输出与 Token 审计</span><span class="lang-en">output & token audit</span></span>
       </div>
       <ul class="alist reveal">
-        <li><b>instance.json</b><span class="lang-zh">名称、图标、分组、绑定模型、temperature、thinking_budget —— 前端网格卡片就是读它渲染的。</span><span class="lang-en">Name, icon, group, bound model, temperature, thinking_budget — the grid cards are rendered from this.</span></li>
+        <li><b>instance.json</b><span class="lang-zh">名称、图标、分组、框架（engine）、provider 与模型 —— 前端网格卡片就是读它渲染的。</span><span class="lang-en">Name, icon, group, framework (engine), provider and model — the grid cards are rendered from this.</span></li>
         <li><b>workspace/</b><span class="lang-zh">稳定的路径意味着会话历史与记忆天然沉淀在这里，跨次启动继续继承。</span><span class="lang-en">A stable path means session history and memory settle here naturally, inherited across launches.</span></li>
         <li><b>.env + credentials</b><span class="lang-zh">密钥只在启动子进程时注入，从不回流到界面 —— 隔离先于一切。</span><span class="lang-en">Keys are injected only when spawning the subprocess, never flowing back to the UI — isolation first.</span></li>
       </ul>
@@ -388,8 +388,8 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
     <div class="sec-head reveal">
       <hr class="spectrum-rule">
       <div class="eyebrow" style="margin-top:16px"><span class="lang-zh">原理</span><span class="lang-en">How it works</span></div>
-      <h2><span class="lang-zh">轻量外壳，把引擎跑起来。</span><span class="lang-en">A light shell that runs the engine.</span></h2>
-      <p><span class="lang-zh">Tauri 2（Rust）负责管理子进程、文件沙箱与凭据；DeepSeek Harness（dsh CLI）才是真正的执行引擎。启动器只是那只手。</span><span class="lang-en">Tauri 2 (Rust) manages subprocesses, the file sandbox and credentials; DeepSeek Harness (the dsh CLI) is the actual engine. The launcher is just the hand that starts it.</span></p>
+      <h2><span class="lang-zh">轻量外壳，把任意引擎跑起来。</span><span class="lang-en">A light shell that runs any engine.</span></h2>
+      <p><span class="lang-zh">Tauri 2（Rust）负责管理子进程、文件沙箱与凭据；六个 <span class="mono">AgentRuntime</span>（<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>）按 <span class="mono">runtime.engine</span> 分发，其中仅 <span class="mono">dsh</span> 支持 web 服务。</span><span class="lang-en">Tauri 2 (Rust) manages subprocesses, the file sandbox and credentials; six <span class="mono">AgentRuntime</span>s (<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>) are dispatched by <span class="mono">runtime.engine</span> — only <span class="mono">dsh</span> has a web serve mode.</span></p>
     </div>
     <div class="flow">
       <div class="step reveal">
@@ -400,13 +400,13 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
       <div class="step reveal">
         <div class="n">02</div>
         <h3><span class="lang-zh">配置能力</span><span class="lang-en">Configure it</span></h3>
-        <p><span class="lang-zh">选 profile 与模型，从 Hub 挑插件，填该实例的密钥。运行形态由 profile 自动推导。</span><span class="lang-en">Choose a profile and model, pick plugins from the Hub, set the instance's keys. Run shape is derived from the profile.</span></p>
+        <p><span class="lang-zh">选引擎与模型（<span class="mono">dsh</span> 再选 profile），从 Hub 挑插件，填该实例的密钥。运行形态由引擎 + profile 推导。</span><span class="lang-en">Pick an engine and model (<span class="mono">dsh</span> also picks a profile), choose plugins from the Hub, set the instance's keys. Run shape is derived from engine + profile.</span></p>
       </div>
       <div class="step reveal">
         <div class="n">03</div>
         <h3><span class="lang-zh">启动</span><span class="lang-en">Launch</span></h3>
-        <p><span class="lang-zh">Web 实例起服务、开浏览器；headless 实例跑一次性任务。stdout 全程流式进日志页。</span><span class="lang-en">Web instances start a server and open the browser; headless instances run a one-shot task. stdout streams into the log view throughout.</span></p>
-        <div class="cli"><span style="color:var(--iris)">$</span> dsh --profile web --no-open --port 0</div>
+        <p><span class="lang-zh"><span class="mono">dsh</span> web 实例起服务、开浏览器；其余引擎跑一次性任务（<span class="mono">-p</span> / <span class="mono">exec</span> / <span class="mono">run</span> 因引擎而异）。stdout 全程流式进日志页。</span><span class="lang-en"><span class="mono">dsh</span> web instances start a server and open the browser; the other engines run one-shot tasks (<span class="mono">-p</span> / <span class="mono">exec</span> / <span class="mono">run</span> per engine). stdout streams into the log view throughout.</span></p>
+        <div class="cli"><span style="color:var(--iris)">$</span> dsh --profile web --no-open --port 0 <span style="color:var(--faint)"># 仅 dsh · other engines: -p / exec / run</span></div>
       </div>
     </div>
   </div>
@@ -422,7 +422,7 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
       <div class="terminal reveal">
         <div class="term-bar"><span class="tl" style="background:#ff5f57"></span><span class="tl" style="background:#febc2e"></span><span class="tl" style="background:#28c840"></span></div>
         <div class="term-body">
-<span class="co"># <span class="lang-zh">前置：Rust 工具链 + Node/pnpm + dsh CLI</span><span class="lang-en">prereqs: Rust toolchain + Node/pnpm + dsh CLI</span></span>
+<span class="co"># <span class="lang-zh">前置：Rust 工具链 + Node/pnpm + 任一引擎 CLI（dsh/pi/omp/claude/codex/opencode）</span><span class="lang-en">prereqs: Rust toolchain + Node/pnpm + any engine CLI (dsh/pi/omp/claude/codex/opencode)</span></span>
 <span class="p">$</span> pnpm install
 <span class="p">$</span> pnpm tauri dev        <span class="co"># <span class="lang-zh">开发</span><span class="lang-en">develop</span></span>
 <span class="p">$</span> pnpm tauri build      <span class="co"># <span class="lang-zh">打包桌面应用</span><span class="lang-en">bundle the app</span></span>
@@ -431,9 +431,9 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
       </div>
       <div class="reveal">
         <ul class="chk">
-          <li><span class="b">1</span><div><b><span class="lang-zh">先装 dsh</span><span class="lang-en">Install dsh first</span></b><p><span class="lang-zh">启动器只是外壳，真正干活的是 DeepSeek Harness。确保 <span class="mono">dsh</span> 在 PATH 里，并配好 DEEPSEEK_API_KEY。</span><span class="lang-en">The launcher is only a shell — DeepSeek Harness does the work. Make sure <span class="mono">dsh</span> is on your PATH with DEEPSEEK_API_KEY set.</span></p></div></li>
+          <li><span class="b">1</span><div><b><span class="lang-zh">先装引擎</span><span class="lang-en">Install an engine first</span></b><p><span class="lang-zh">启动器只是外壳，真正干活的是你选的 CLI。至少装一个引擎（<span class="mono">dsh</span> / <span class="mono">pi</span> / <span class="mono">omp</span> / <span class="mono">claude</span> / <span class="mono">codex</span> / <span class="mono">opencode</span>）到 <span class="mono">PATH</span>，并配好对应密钥（如 <span class="mono">DEEPSEEK_API_KEY</span> / <span class="mono">ANTHROPIC_API_KEY</span> 等）。</span><span class="lang-en">The launcher is only a shell — the CLI you pick does the work. Install at least one engine (<span class="mono">dsh</span> / <span class="mono">pi</span> / <span class="mono">omp</span> / <span class="mono">claude</span> / <span class="mono">codex</span> / <span class="mono">opencode</span>) on your <span class="mono">PATH</span> and set its key (e.g. <span class="mono">DEEPSEEK_API_KEY</span> / <span class="mono">ANTHROPIC_API_KEY</span>).</span></p></div></li>
           <li><span class="b">2</span><div><b><span class="lang-zh">新建实例</span><span class="lang-en">Create an instance</span></b><p><span class="lang-zh">点「添加实例」，选 web profile 与模型，实例文件夹会在 <span class="mono">~/.agentlauncher/</span> 下生成。</span><span class="lang-en">Hit "Add instance", pick the web profile and a model; the folder is created under <span class="mono">~/.agentlauncher/</span>.</span></p></div></li>
-          <li><span class="b">3</span><div><b><span class="lang-zh">启动并对话</span><span class="lang-en">Launch & chat</span></b><p><span class="lang-zh">按「启动」，浏览器自动打开 dsh 网页，开始对话。历史会留在该实例的 workspace 里。</span><span class="lang-en">Press "Launch"; the browser opens dsh's web page and you start chatting. History stays in the instance's workspace.</span></p></div></li>
+          <li><span class="b">3</span><div><b><span class="lang-zh">启动</span><span class="lang-en">Launch</span></b><p><span class="lang-zh">按「启动」：<span class="mono">dsh</span> web 实例自动打开浏览器对话，其余引擎以 headless 任务运行并把输出流式进日志页。历史留在该实例的 <span class="mono">workspace/</span> 里。</span><span class="lang-en">Press "Launch": <span class="mono">dsh</span> web instances open the browser to chat; the other engines run as headless tasks with streaming logs. History stays in the instance's <span class="mono">workspace/</span>.</span></p></div></li>
         </ul>
         <p class="note"><span class="lang-zh">目前面向本地构建（Tauri dev / build）；技术栈 Rust + Vue 3。</span><span class="lang-en">Currently a local build (Tauri dev / build); stack is Rust + Vue 3.</span></p>
       </div>
@@ -448,7 +448,7 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
       <div class="badges">
         <span class="pill">Tauri 2 · Rust</span>
         <span class="pill">Vue 3 · Vite</span>
-        <span class="pill">DeepSeek Harness</span>
+        <span class="pill">dsh · pi · omp · claude · codex · opencode</span>
       </div>
     </div>
     <div style="text-align:right">

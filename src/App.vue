@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Instance, RunStatus } from "@/types";
-import { api, onDshStatus } from "@/lib/api";
+import { api, onRuntimeStatus } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { config } from "@/lib/launcherConfig";
 import TopBar from "@/components/TopBar.vue";
@@ -49,7 +49,7 @@ const statusLabelMap: Record<RunStatus, string> = {
   error: "status.error",
 };
 const contextLine = computed(() => {
-  if (!selectedInstance.value) return `${t("status.defaultModel")}：deepseek-reasoner`;
+  if (!selectedInstance.value) return t("status.noSelection");
   return `${selectedInstance.value.name} · ${selectedInstance.value.model} · ${t(statusLabelMap[selectedStatus.value])}`;
 });
 
@@ -70,7 +70,7 @@ watch(selectedId, (id) => {
 
 onMounted(async () => {
   await loadInstances();
-  unlistenStatus = await onDshStatus((e) => {
+  unlistenStatus = await onRuntimeStatus((e) => {
     statuses.value = { ...statuses.value, [e.instanceId]: e.status };
     if (e.url) {
       urls.value = { ...urls.value, [e.instanceId]: e.url };
@@ -143,8 +143,6 @@ async function duplicate() {
     profile: s.profile,
     provider: s.provider,
     model: s.model,
-    temperature: s.temperature,
-    thinking_budget: s.thinking_budget,
     runtime: { ...s.runtime },
     default_task: s.default_task,
   });
@@ -195,9 +193,8 @@ function noop() {}
       />
     </div>
     <StatusBar
-      engine-version="v0.1.0"
+      app-version="v0.1.0"
       :running-count="runningIds.length"
-      :default-model="selectedInstance?.model || 'deepseek-reasoner'"
       :context-line="contextLine"
     />
 
