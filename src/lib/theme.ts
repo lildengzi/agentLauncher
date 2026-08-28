@@ -13,6 +13,11 @@ const FAST_CACHE = "agentlauncher.theme";
 function apply(id: string): void {
   const theme = getTheme(id);
   const root = document.documentElement;
+  // Clear first: `apply` writes inline properties, so a var a previous theme set
+  // but this one omits would otherwise linger on <html> forever.
+  for (const k of Object.keys(themes[0].vars)) {
+    root.style.removeProperty(k);
+  }
   for (const [k, v] of Object.entries(theme.vars)) {
     root.style.setProperty(k, v);
   }

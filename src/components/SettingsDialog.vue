@@ -96,7 +96,7 @@ function pickProvider(id: string): void {
           v-for="n in nav"
           :key="n.id"
           type="button"
-          class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors"
+          class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[14px] transition-colors"
           :class="section === n.id ? 'bg-selection text-selection-foreground' : 'text-foreground/85 hover:bg-accent'"
           @click="section = n.id"
         >
@@ -110,7 +110,7 @@ function pickProvider(id: string): void {
         <!-- APPEARANCE -->
         <template v-if="section === 'appearance'">
           <GroupBox :title="t('settings.theme')">
-            <p class="mb-3 text-[12px] text-muted-foreground">{{ t('settings.theme.desc') }}</p>
+            <p class="mb-3 text-[13px] text-muted-foreground">{{ t('settings.theme.desc') }}</p>
             <div class="grid grid-cols-3 gap-2">
               <button
                 v-for="th in themes"
@@ -126,7 +126,7 @@ function pickProvider(id: string): void {
                   <span class="flex-1" :style="{ background: swatch(th.vars, '--selection') }" />
                   <span class="flex-1" :style="{ background: swatch(th.vars, '--link') }" />
                 </span>
-                <span class="flex items-center justify-between text-[12px] text-foreground/90">
+                <span class="flex items-center justify-between text-[13px] text-foreground/90">
                   {{ th.label }}
                   <Check v-if="current === th.id" class="h-3.5 w-3.5 text-selection" />
                 </span>
@@ -138,7 +138,7 @@ function pickProvider(id: string): void {
         <!-- GENERAL -->
         <template v-else-if="section === 'general'">
           <GroupBox :title="t('settings.language')">
-            <p class="mb-3 text-[12px] text-muted-foreground">{{ t('settings.language.desc') }}</p>
+            <p class="mb-3 text-[13px] text-muted-foreground">{{ t('settings.language.desc') }}</p>
             <div class="flex gap-2">
               <Button
                 v-for="l in (['zh','en'] as Locale[])"
@@ -155,16 +155,16 @@ function pickProvider(id: string): void {
         <!-- MODEL & API -->
         <template v-else-if="section === 'model'">
           <GroupBox :title="t('settings.model.title')">
-            <p class="mb-3 text-[12px] text-muted-foreground">{{ t('settings.model.desc') }}</p>
+            <p class="mb-3 text-[13px] text-muted-foreground">{{ t('settings.model.desc') }}</p>
             <div class="grid grid-cols-[120px_1fr] items-center gap-x-3 gap-y-3">
-              <label class="text-[13px] text-foreground/85">{{ t('settings.model.provider') }}</label>
+              <label class="text-[14px] text-foreground/85">{{ t('settings.model.provider') }}</label>
               <Select
                 :model-value="modelConfig.provider"
                 :options="providerOptions"
                 @update:model-value="pickProvider"
               />
 
-              <label class="text-[13px] text-foreground/85">{{ t('settings.model.apiKey') }}</label>
+              <label class="text-[14px] text-foreground/85">{{ t('settings.model.apiKey') }}</label>
               <div class="flex flex-col gap-1">
                 <Input
                   v-model="modelConfig.apiKey"
@@ -172,7 +172,7 @@ function pickProvider(id: string): void {
                   :placeholder="keyStored ? '•••••••• (已保存到 ~/.dsh)' : 'sk-...'"
                   class="font-mono"
                 />
-                <span class="inline-flex items-center gap-1 text-[11px]" :class="keyStored ? 'text-emerald-400' : 'text-muted-foreground'">
+                <span class="inline-flex items-center gap-1 text-[12px]" :class="keyStored ? 'text-emerald-400' : 'text-muted-foreground'">
                   <template v-if="!activeEnv">{{ t('settings.model.noProvider') }}</template>
                   <template v-else-if="keyStored">
                     <Check class="h-3 w-3 shrink-0" />
@@ -182,15 +182,15 @@ function pickProvider(id: string): void {
                 </span>
               </div>
 
-              <label class="text-[13px] text-foreground/85">{{ t('settings.model.defaultModel') }}</label>
+              <label class="text-[14px] text-foreground/85">{{ t('settings.model.defaultModel') }}</label>
               <Input v-model="modelConfig.defaultModel" placeholder="deepseek-v4-flash" />
             </div>
             <div class="mt-4 flex items-center gap-3">
               <Button variant="primary" @click="onSaveModel">{{ t('settings.model.save') }}</Button>
-              <span v-if="savedFlash" class="flex items-center gap-1 text-[12px] text-emerald-400">
+              <span v-if="savedFlash" class="flex items-center gap-1 text-[13px] text-emerald-400">
                 <Check class="h-3.5 w-3.5" /> {{ t('settings.model.saved') }}
               </span>
-              <span v-if="saveError" class="text-[12px] text-destructive">{{ saveError }}</span>
+              <span v-if="saveError" class="text-[13px] text-destructive">{{ saveError }}</span>
             </div>
           </GroupBox>
         </template>
@@ -198,8 +198,8 @@ function pickProvider(id: string): void {
         <!-- ABOUT -->
         <template v-else>
           <GroupBox title="agentLauncher">
-            <p class="text-[13px] leading-relaxed text-foreground/85">{{ t('settings.about.desc') }}</p>
-            <p class="mt-2 text-[12px] text-muted-foreground">Tauri 2 · Vue 3 · v0.1.0</p>
+            <p class="text-[14px] leading-relaxed text-foreground/85">{{ t('settings.about.desc') }}</p>
+            <p class="mt-2 text-[13px] text-muted-foreground">Tauri 2 · Vue 3 · v0.1.0</p>
           </GroupBox>
         </template>
       </div>

@@ -29,15 +29,15 @@ const variants: Record<string, string> = {
 };
 
 const sizes: Record<string, string> = {
-  sm: "h-7 px-2.5 text-xs",
-  md: "h-8 px-3.5 text-[13px]",
-  lg: "h-9 px-5 text-sm",
+  sm: "h-7 px-2.5 text-[13px]",
+  md: "h-8 px-3.5 text-[14px]",
+  lg: "h-9 px-5 text-[15px]",
   icon: "h-8 w-8",
 };
 
 const classes = computed(() =>
   cn(
-    "inline-flex items-center justify-center gap-1.5 rounded font-normal transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 select-none",
+    "inline-flex items-center justify-center gap-1.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 select-none",
     variants[props.variant],
     sizes[props.size],
     props.class

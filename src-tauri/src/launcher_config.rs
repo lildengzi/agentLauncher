@@ -42,7 +42,7 @@ pub struct UiPrefs {
 }
 fn default_theme() -> String {
     // Matches the frontend theme engine's DEFAULT_THEME (src/lib/themes.ts).
-    "catppuccin-mocha".to_string()
+    "prism-dark".to_string()
 }
 fn default_locale() -> String {
     "zh".to_string()
@@ -238,7 +238,7 @@ mod tests {
     fn missing_file_is_default() {
         let cfg: LauncherConfig = read_or_default(&temp_path("absent"));
         assert_eq!(cfg.format_version, 1);
-        assert_eq!(cfg.ui.theme, "catppuccin-mocha");
+        assert_eq!(cfg.ui.theme, "prism-dark");
         assert_eq!(cfg.ui.locale, "zh");
         // No vendor default: empty ⇒ the chosen engine's own default.
         assert!(cfg.defaults.provider.is_empty());
@@ -281,7 +281,7 @@ mod tests {
         let p = temp_path("malformed");
         fs::write(&p, "not json at all {{{").unwrap();
         let cfg: LauncherConfig = read_or_default(&p);
-        assert_eq!(cfg.ui.theme, "catppuccin-mocha");
+        assert_eq!(cfg.ui.theme, "prism-dark");
         fs::remove_file(&p).ok();
     }
 

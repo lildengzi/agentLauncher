@@ -249,7 +249,7 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
           <button
             v-for="v in views"
             :key="v.key"
-            class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors"
+            class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[14px] transition-colors"
             :class="
               view === v.key
                 ? 'bg-selection text-selection-foreground'
@@ -262,14 +262,14 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
           </button>
         </div>
         <div v-if="tagChips.length" class="border-t border-border px-3 py-2">
-          <p class="mb-1.5 text-[11px] font-medium text-muted-foreground">
+          <p class="mb-1.5 text-[12px] font-medium text-muted-foreground">
             {{ t('hub.hotTags') }}
           </p>
           <div class="flex flex-wrap gap-1">
             <button
               v-for="tag in tagChips"
               :key="tag"
-              class="rounded px-1.5 py-0.5 text-[11px] transition-colors"
+              class="rounded px-1.5 py-0.5 text-[12px] transition-colors"
               :class="
                 selectedTags.includes(tag)
                   ? 'bg-selection text-selection-foreground'
@@ -293,26 +293,26 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
             class="w-auto shrink-0"
             @update:model-value="setSort"
           />
-          <label class="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground">
+          <label class="flex shrink-0 items-center gap-1 text-[13px] text-muted-foreground">
             <input v-model="noConfigOnly" type="checkbox" class="accent-primary" />
             {{ t('hub.noConfig') }}
           </label>
         </div>
 
         <div class="flex-1 overflow-y-auto">
-          <p v-if="loading" class="py-10 text-center text-[13px] text-muted-foreground">
+          <p v-if="loading" class="py-10 text-center text-[14px] text-muted-foreground">
             {{ t('hub.loading') }}
           </p>
           <div v-else-if="loadError" class="flex flex-col items-center gap-2 py-10 text-center">
-            <p class="px-4 text-[13px] text-destructive">{{ t('hub.loadError') }}</p>
-            <p class="px-6 text-[11px] text-muted-foreground">{{ loadError }}</p>
+            <p class="px-4 text-[14px] text-destructive">{{ t('hub.loadError') }}</p>
+            <p class="px-6 text-[12px] text-muted-foreground">{{ loadError }}</p>
             <Button variant="outline" size="sm" @click="load()">{{ t('hub.retry') }}</Button>
           </div>
-          <p v-else-if="results.length === 0" class="py-10 text-center text-[13px] text-muted-foreground">
+          <p v-else-if="results.length === 0" class="py-10 text-center text-[14px] text-muted-foreground">
             {{ t('hub.empty') }}
           </p>
           <template v-else>
-            <p v-if="stale" class="border-b border-border/60 bg-accent/40 px-3 py-1 text-[11px] text-muted-foreground">
+            <p v-if="stale" class="border-b border-border/60 bg-accent/40 px-3 py-1 text-[12px] text-muted-foreground">
               {{ t('hub.staleNotice') }}
             </p>
             <div
@@ -329,14 +329,14 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
               <Avatar :seed="row.plugin.id" :brand="pluginBrand(row.plugin)" :size="36" />
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
-                  <span class="truncate text-[13px] font-semibold">{{ row.plugin.name }}</span>
+                  <span class="truncate text-[14px] font-semibold">{{ row.plugin.name }}</span>
                   <Badge v-if="isInstalled(row.plugin)" variant="default">{{ t('hub.installed') }}</Badge>
-                  <span class="ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                  <span class="ml-auto shrink-0 text-[12px] tabular-nums text-muted-foreground">
                     ★ {{ row.plugin.stars }}
                   </span>
                 </div>
                 <p
-                  class="truncate text-[12px]"
+                  class="truncate text-[13px]"
                   :class="
                     selected && selected.id === row.plugin.id
                       ? 'text-selection-foreground/80'
@@ -353,19 +353,19 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
 <!-- @@DETAIL@@ -->
       <!-- RIGHT: detail pane -->
       <div class="w-80 shrink-0 overflow-y-auto bg-panel p-4">
-        <p v-if="!selected" class="py-10 text-center text-[13px] text-muted-foreground">
+        <p v-if="!selected" class="py-10 text-center text-[14px] text-muted-foreground">
           {{ t('right.selectHint') }}
         </p>
         <div v-else class="flex flex-col gap-3">
           <div class="flex items-center gap-3">
             <Avatar :seed="selected.id" :brand="pluginBrand(selected)" :size="44" />
             <div class="min-w-0">
-              <h3 class="truncate text-[15px] font-semibold text-foreground">{{ selected.name }}</h3>
-              <p class="truncate text-[12px] text-muted-foreground">{{ selected.owner }}</p>
+              <h3 class="truncate text-[16px] font-semibold text-foreground">{{ selected.name }}</h3>
+              <p class="truncate text-[13px] text-muted-foreground">{{ selected.owner }}</p>
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div class="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
             <Badge variant="outline">{{ selected.type === 'skill' ? t('hub.type.skill') : t('hub.type.cordis') }}</Badge>
             <span class="inline-flex items-center gap-1"><Star class="h-3 w-3" /> {{ selected.stars }}</span>
             <span class="inline-flex items-center gap-1"><GitFork class="h-3 w-3" /> {{ selected.forks }}</span>
@@ -373,34 +373,34 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
           </div>
 
           <div v-if="selected.tags.length" class="flex flex-wrap gap-1">
-            <span v-for="tag in selected.tags" :key="tag" class="rounded bg-accent/60 px-1.5 py-0.5 text-[11px] text-foreground/80">
+            <span v-for="tag in selected.tags" :key="tag" class="rounded bg-accent/60 px-1.5 py-0.5 text-[12px] text-foreground/80">
               {{ tag }}
             </span>
           </div>
 
-          <p class="text-[13px] leading-relaxed text-foreground/90">
+          <p class="text-[14px] leading-relaxed text-foreground/90">
             {{ selected.descriptionZh || selected.description || t('hub.noDescription') }}
           </p>
 
           <!-- five-dimension practical score -->
           <div class="flex flex-col gap-1.5 rounded border border-border/60 bg-background/40 p-2.5">
-            <div class="flex items-center justify-between text-[12px]">
+            <div class="flex items-center justify-between text-[13px]">
               <span class="font-medium text-foreground">{{ t('hub.score.title') }}</span>
               <span class="tabular-nums text-foreground">{{ selected.score.total }}<span class="text-muted-foreground">/100</span></span>
             </div>
             <div v-for="bar in scoreBars" :key="bar.key" class="flex items-center gap-2">
-              <span class="w-12 shrink-0 text-[10px] text-muted-foreground">{{ bar.key }}</span>
+              <span class="w-12 shrink-0 text-[11px] text-muted-foreground">{{ bar.key }}</span>
               <span class="h-1.5 flex-1 overflow-hidden rounded-full bg-accent">
                 <span class="block h-full rounded-full bg-primary" :style="{ width: bar.v + '%' }" />
               </span>
-              <span class="w-6 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">{{ bar.v }}</span>
+              <span class="w-6 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{{ bar.v }}</span>
             </div>
-            <p v-if="selected.score.explanation" class="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            <p v-if="selected.score.explanation" class="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
               {{ selected.score.explanation }}
             </p>
           </div>
 
-          <div class="flex flex-col gap-1 text-[13px]">
+          <div class="flex flex-col gap-1 text-[14px]">
             <a :href="'https://github.com/' + selected.fullName" target="_blank" rel="noopener noreferrer" class="text-link hover:underline">
               {{ t('hub.repo') }}
             </a>
@@ -409,7 +409,7 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
             </a>
           </div>
 
-          <p class="text-[12px] text-muted-foreground">
+          <p class="text-[13px] text-muted-foreground">
             {{ t('hub.profile') }}: <code class="text-foreground/80">{{ profile }}</code>
           </p>
         </div>
@@ -418,11 +418,11 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
     </div>
 
     <template #footer>
-      <span v-if="opError" class="mr-2 truncate text-[12px] text-destructive" :title="opError">{{ opError }}</span>
+      <span v-if="opError" class="mr-2 truncate text-[13px] text-destructive" :title="opError">{{ opError }}</span>
       <div class="flex-1" />
       <template v-if="selected">
         <template v-if="selected.type === 'skill'">
-          <span class="mr-1 self-center text-[12px] text-muted-foreground">{{ t('hub.skillManual') }}</span>
+          <span class="mr-1 self-center text-[13px] text-muted-foreground">{{ t('hub.skillManual') }}</span>
           <Button variant="outline" @click="copyCommand(selected)">
             <Check v-if="copied" class="h-4 w-4" />
             <Copy v-else class="h-4 w-4" />

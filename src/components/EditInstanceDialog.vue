@@ -246,7 +246,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
           v-for="item in navItems"
           :key="item.key"
           type="button"
-          class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors"
+          class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[14px] transition-colors"
           :class="
             section === item.key
               ? 'bg-selection text-selection-foreground'
@@ -263,7 +263,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
       <div class="min-w-0 flex-1 overflow-y-auto px-5 py-4">
         <div
           v-if="errorBanner"
-          class="mb-4 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-[13px] text-destructive"
+          class="mb-4 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-[14px] text-destructive"
         >
           {{ errorBanner }}
         </div>
@@ -274,7 +274,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
             <Label for="inst-name">{{ t("edit.name") }}</Label>
             <div>
               <Input id="inst-name" v-model="form.name" />
-              <p v-if="nameError" class="mt-1 text-[12px] text-destructive">
+              <p v-if="nameError" class="mt-1 text-[13px] text-destructive">
                 {{ nameError }}
               </p>
             </div>
@@ -289,7 +289,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
                 </span>
                 <Input id="inst-icon" v-model="form.icon" class="flex-1" />
               </div>
-              <p class="mt-1 text-[12px] text-muted-foreground">
+              <p class="mt-1 text-[13px] text-muted-foreground">
                 {{ t("edit.iconHint") }}
               </p>
             </div>
@@ -309,14 +309,14 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
               <Label for="inst-provider">{{ t("edit.model.provider") }}</Label>
               <div>
                 <Input id="inst-provider" v-model="form.provider" />
-                <p class="mt-1 text-[12px] text-muted-foreground">
+                <p class="mt-1 text-[13px] text-muted-foreground">
                   {{ t("edit.model.providerHint") }}
                 </p>
               </div>
             </template>
             <template v-else>
               <Label>{{ t("edit.model.provider") }}</Label>
-              <p class="pt-2 text-[12px] text-muted-foreground">
+              <p class="pt-2 text-[13px] text-muted-foreground">
                 {{ t("edit.model.providerEnvOnly") }}
               </p>
             </template>
@@ -332,7 +332,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
             <Label for="inst-engine">{{ t("edit.runtime.engine") }}</Label>
             <div>
               <Select id="inst-engine" v-model="form.engine" :options="engineOptions" />
-              <p class="mt-1 text-[12px] text-muted-foreground">
+              <p class="mt-1 text-[13px] text-muted-foreground">
                 {{ t("edit.runtime.engineHint") }}
                 <template v-if="selectedEngine && !selectedEngine.installed">
                   · <span class="text-destructive">{{ t("edit.runtime.engineMissing") }}</span>
@@ -347,10 +347,10 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
                  by a field that exists for dsh alone. -->
             <Label>{{ t("edit.runtime.shape") }}</Label>
             <div class="pt-2">
-              <span class="text-[13px]">
+              <span class="text-[14px]">
                 {{ runsWeb ? t("edit.runtime.shape.web") : t("edit.runtime.shape.headless") }}
               </span>
-              <p class="mt-1 text-[12px] text-muted-foreground">
+              <p class="mt-1 text-[13px] text-muted-foreground">
                 {{
                   selectedEngine && selectedEngine.web
                     ? t("edit.runtime.shapeHintProfile")
@@ -366,7 +366,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
                 v-model="form.env_policy"
                 :options="envPolicyOptions"
               />
-              <p class="mt-1 text-[12px] text-muted-foreground">
+              <p class="mt-1 text-[13px] text-muted-foreground">
                 {{ t("edit.runtime.envPolicyHint") }}
               </p>
             </div>
@@ -380,7 +380,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
                 v-model="form.custom_bin"
                 :placeholder="`/usr/local/bin/${form.engine || 'dsh'}`"
               />
-              <p class="mt-1 text-[12px] text-muted-foreground">
+              <p class="mt-1 text-[13px] text-muted-foreground">
                 {{ t("edit.runtime.customBinHint") }}
               </p>
             </div>
@@ -390,7 +390,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
                named after it, so a vendor-specific field never reads as a
                launcher-wide one — dsh's `profile` is the only such knob today. -->
           <div v-if="isDsh" class="mt-4 border-t border-border pt-4">
-            <p class="mb-3 text-[12px] text-muted-foreground">
+            <p class="mb-3 text-[13px] text-muted-foreground">
               {{ t("edit.runtime.engineSpecific") }} ·
               <span class="font-mono">{{ selectedEngine?.display || form.engine }}</span>
             </p>
@@ -398,7 +398,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
               <Label for="inst-profile">{{ t("edit.profile") }}</Label>
               <div>
                 <Select id="inst-profile" v-model="form.profile" :options="profileOptions" />
-                <p class="mt-1 text-[12px] text-muted-foreground">
+                <p class="mt-1 text-[13px] text-muted-foreground">
                   {{ t("edit.profileHint") }}
                 </p>
               </div>
@@ -411,7 +411,7 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
           <div class="grid gap-1.5">
             <Label for="inst-task">{{ t("edit.defaultTask") }}</Label>
             <Textarea id="inst-task" v-model="form.default_task" class="min-h-[140px]" />
-            <p class="text-[12px] text-muted-foreground">
+            <p class="text-[13px] text-muted-foreground">
               {{ t("edit.defaultTaskHint") }}
             </p>
           </div>

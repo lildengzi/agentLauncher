@@ -1,40 +1,43 @@
 <script setup lang="ts">
+// A top-bar segment. Flat, 34px tall to match the reference toolbar; the
+// accelerator is a Qt-style mnemonic printed in the label's own colour, not a
+// dimmed hint — in Prism Launcher `添加实例 (E)` reads as one bright string.
+// One button, one action: no split caret, because a caret with no menu behind it
+// reads as a dropdown that never opens, and its divider reads as a toolbar
+// separator. Hover is the only thing that delineates segments.
 import AppIcon from "@/components/ui/AppIcon.vue";
-import { ChevronDown } from "lucide-vue-next";
 
 withDefaults(
   defineProps<{
     icon?: string;
     label: string;
     accel?: string;
-    split?: boolean;
     disabled?: boolean;
+    /** the segment reads as toggled-on (a filter / mode is active). */
+    active?: boolean;
   }>(),
-  { split: false, disabled: false }
+  { disabled: false, active: false }
 );
 
-defineEmits<{ click: []; arrow: [] }>();
+defineEmits<{ click: [] }>();
 </script>
 
 <template>
-  <div class="flex items-stretch">
-    <button
-      type="button"
-      :disabled="disabled"
-      class="group flex items-center gap-1.5 px-2.5 py-1.5 text-[13px] text-foreground/90 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-40 transition-colors"
-      @click="$emit('click')"
+  <button
+    type="button"
+    :disabled="disabled"
+    :title="label"
+    class="flex h-[34px] shrink-0 items-center gap-2 px-3 text-[13.5px] transition-colors duration-75 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-35"
+    :class="active ? 'bg-accent text-accent-foreground' : 'text-foreground'"
+    @click="$emit('click')"
+  >
+    <AppIcon v-if="icon" :name="icon" class="h-4 w-4 shrink-0" />
+    <span class="whitespace-nowrap"
+      >{{ label
+      }}<span v-if="accel">
+        (<span class="mnemonic">{{ accel }}</span
+        >)</span
+      ></span
     >
-      <AppIcon v-if="icon" :name="icon" class="h-4 w-4 shrink-0 opacity-90" />
-      <span>{{ label }}<span v-if="accel" class="opacity-70"> (<span class="mnemonic">{{ accel }}</span>)</span></span>
-    </button>
-    <button
-      v-if="split"
-      type="button"
-      :disabled="disabled"
-      class="flex items-center px-1 hover:bg-accent hover:text-accent-foreground border-l border-border/60 disabled:pointer-events-none disabled:opacity-40 transition-colors"
-      @click="$emit('arrow')"
-    >
-      <ChevronDown class="h-3.5 w-3.5 opacity-70" />
-    </button>
-  </div>
+  </button>
 </template>

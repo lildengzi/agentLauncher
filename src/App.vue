@@ -13,6 +13,8 @@ import HubDialog from "@/components/HubDialog.vue";
 import ConsoleDialog from "@/components/ConsoleDialog.vue";
 import SettingsDialog from "@/components/SettingsDialog.vue";
 
+const REPO_URL = "https://github.com/lildengzi/agentLauncher";
+
 const { t } = useI18n();
 
 const instances = ref<Instance[]>([]);
@@ -26,6 +28,10 @@ const consoleOpen = ref(false);
 const settingsOpen = ref(false);
 
 let unlistenStatus: (() => void) | null = null;
+
+const dialogOpen = computed(
+  () => editOpen.value || hubOpen.value || consoleOpen.value || settingsOpen.value
+);
 
 const selectedInstance = computed(
   () => instances.value.find((i) => i.id === selectedId.value) ?? null
@@ -54,7 +60,10 @@ const contextLine = computed(() => {
 });
 
 async function loadInstances() {
-  instances.value = await api.listInstances();
+  instances.value = await api.listInstances().catch((e) => {
+    console.error("list instances failed", e);
+    return instances.value;
+  });
   if (!selectedId.value && instances.value.length) {
     // Restore the last selected instance from session state, if it still exists.
     const saved = config.session.selected_instance;
@@ -69,6 +78,8 @@ watch(selectedId, (id) => {
 });
 
 onMounted(async () => {
+  // Bind the mnemonics first so a slow backend can never strand the keyboard.
+  window.addEventListener("keydown", onKey);
   await loadInstances();
   unlistenStatus = await onRuntimeStatus((e) => {
     statuses.value = { ...statuses.value, [e.instanceId]: e.status };
@@ -80,7 +91,10 @@ onMounted(async () => {
     }
   });
 });
-onBeforeUnmount(() => unlistenStatus?.());
+onBeforeUnmount(() => {
+  unlistenStatus?.();
+  window.removeEventListener("keydown", onKey);
+});
 
 function openCreate() {
   editingInstance.value = null;
@@ -160,7 +174,41 @@ async function remove() {
 function exportProfile() {
   console.info("导出 Profile（MVP 占位）", selectedInstance.value?.id);
 }
-function noop() {}
+function openRepo() {
+  api.openUrl(REPO_URL).catch(console.error);
+}
+
+// The mnemonics printed on the buttons, bound the Qt way: Alt + letter, and only
+// while no dialog is open. They used to be decoration only.
+function onKey(e: KeyboardEvent) {
+  if (!e.altKey || e.ctrlKey || e.metaKey || dialogOpen.value) return;
+  const hit = (fn: () => void) => {
+    e.preventDefault();
+    fn();
+  };
+  switch (e.key.toLowerCase()) {
+    case "e":
+      return hit(openCreate);
+    case "o":
+      return hit(() => void openFolder());
+    case "n":
+      return hit(() => (settingsOpen.value = true));
+    case "l":
+      return hit(() => void start());
+    case "k":
+      return hit(() => void stop());
+    case "c":
+      return hit(() => (hubOpen.value = true));
+    case "f":
+      return hit(() => void openFolder());
+    case "x":
+      return hit(exportProfile);
+    case "y":
+      return hit(() => void duplicate());
+    case "t":
+      return hit(() => void remove());
+  }
+}
 </script>
 
 <template>
@@ -169,7 +217,7 @@ function noop() {}
       @add="openCreate"
       @folder="openFolder"
       @settings="settingsOpen = true"
-      @help="noop"
+      @help="openRepo"
     />
     <div class="flex min-h-0 flex-1">
       <InstanceGrid
@@ -196,6 +244,7 @@ function noop() {}
       app-version="v0.1.0"
       :running-count="runningIds.length"
       :context-line="contextLine"
+      @more="openRepo"
     />
 
     <ConsoleDialog

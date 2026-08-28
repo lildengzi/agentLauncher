@@ -3,6 +3,22 @@ export default {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        // Every machine-readable value renders in this stack: model ids, paths,
+        // engine names, counts, log tails.
+        mono: [
+          "JetBrains Mono",
+          "Fira Code",
+          "Cascadia Code",
+          "Cascadia Mono",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Consolas",
+          "Noto Sans Mono",
+          "monospace",
+        ],
+      },
       colors: {
         border: "hsl(var(--border))",
         "border-strong": "hsl(var(--border-strong))",

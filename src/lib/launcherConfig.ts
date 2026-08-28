@@ -16,7 +16,7 @@ import type { LauncherConfig } from "@/types";
 export function defaultConfig(): LauncherConfig {
   return {
     format_version: 1,
-    ui: { theme: "catppuccin-mocha", locale: "zh" },
+    ui: { theme: "prism-dark", locale: "zh" },
     // Empty defaults = "let the chosen engine use its own"; see AgentDefaults in
     // src-tauri/src/launcher_config.rs. Must match the backend's defaults, since
     // this object is what a first run persists.

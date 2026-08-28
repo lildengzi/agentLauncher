@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { Boxes, Newspaper } from "lucide-vue-next";
+// Prism Launcher's two-row footer, structure intact: the launcher line with the
+// news link, then the context line for the selected instance. Only the paint
+// changed — and 更多信息 now actually goes somewhere.
+import PrismMark from "@/components/ui/PrismMark.vue";
+import { Newspaper } from "lucide-vue-next";
 import { useI18n } from "@/lib/i18n";
 
 const { t } = useI18n();
@@ -9,22 +13,31 @@ defineProps<{
   runningCount: number;
   contextLine: string;
 }>();
+defineEmits<{ more: [] }>();
 </script>
 
 <template>
-  <footer class="border-t border-border bg-toolbar text-[12px] text-muted-foreground">
-    <div class="flex items-center gap-2 px-3 py-1">
-      <Boxes class="h-3.5 w-3.5 opacity-80" />
-      <span class="font-medium text-foreground/80">agentLauncher</span>
-      <span class="opacity-70">{{ appVersion }}</span>
+  <footer class="shrink-0 border-t border-border bg-toolbar text-[12px] text-muted-foreground">
+    <div class="flex h-[22px] items-center gap-2 px-2.5">
+      <PrismMark :size="11" class="shrink-0 text-foreground/50" />
+      <span class="text-foreground/75">agentLauncher</span>
+      <span class="font-mono text-muted-foreground/70">{{ appVersion }}</span>
       <div class="flex-1" />
-      <span v-if="runningCount > 0" class="text-link">{{ t('status.runningN') }} {{ runningCount }}</span>
-      <button class="flex items-center gap-1 hover:text-foreground">
-        <Newspaper class="h-3.5 w-3.5" />
+      <span v-if="runningCount > 0" class="font-mono text-foreground/75">
+        {{ t('status.runningN') }} {{ runningCount }}
+      </span>
+      <button
+        type="button"
+        class="flex items-center gap-1 hover:text-foreground"
+        @click="$emit('more')"
+      >
+        <Newspaper class="h-3 w-3" />
         {{ t('status.more') }}
       </button>
     </div>
-    <div class="border-t border-border/60 bg-background px-3 py-1 text-[11px]">
+    <div
+      class="truncate border-t border-border/60 bg-background px-2.5 py-1 font-mono text-muted-foreground/80"
+    >
       {{ contextLine }}
     </div>
   </footer>

@@ -31,10 +31,10 @@ const busy = computed(
     <template #header>
       <div class="flex items-center gap-2">
         <Avatar v-if="instance" :seed="instance.id" :icon="instance.icon" :brand="brandForModel(instance.model)" :size="20" />
-        <span class="text-[15px] font-semibold text-foreground">
+        <span class="text-[16px] font-semibold text-foreground">
           {{ instance?.name ?? t('console.title') }}
         </span>
-        <span class="text-[12px] text-muted-foreground">· {{ t('console.title') }}</span>
+        <span class="text-[13px] text-muted-foreground">· {{ t('console.title') }}</span>
         <StatusDot :status="status" label class="ml-2" />
       </div>
     </template>
@@ -49,7 +49,7 @@ const busy = computed(
         />
       </div>
       <div class="flex items-center gap-2 border-t border-border bg-toolbar px-3 py-2">
-        <span class="flex-1 text-[12px] text-muted-foreground">{{ t('console.readonlyHint') }}</span>
+        <span class="flex-1 text-[13px] text-muted-foreground">{{ t('console.readonlyHint') }}</span>
         <Button v-if="url" variant="primary" @click="emit('openWeb')">
           <Globe class="h-4 w-4" /> {{ t('console.openWeb') }}
         </Button>

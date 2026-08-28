@@ -14,7 +14,7 @@ const checked = defineModel<boolean>("checked", { default: true });
 
 <template>
   <fieldset class="mb-4">
-    <legend class="mb-1.5 flex items-center gap-2 px-0.5 text-[13px] font-medium text-foreground">
+    <legend class="mb-1.5 flex items-center gap-2 px-0.5 text-[14px] font-semibold text-foreground">
       <input
         v-if="checkable"
         type="checkbox"

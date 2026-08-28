@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
     :disabled="disabled"
     :class="
       cn(
-        'flex h-8 w-full items-center justify-between gap-2 rounded-sm border border-input bg-[hsl(var(--input))] px-2.5 text-left text-[13px] text-foreground transition-colors hover:border-border-strong focus:border-selection focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45',
+        'flex h-8 w-full items-center justify-between gap-2 rounded-sm border border-input bg-[hsl(var(--input))] px-2.5 text-left text-[14px] text-foreground transition-colors hover:border-border-strong focus:border-selection focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45',
         open && 'border-selection',
         props.class
       )
@@ -170,7 +170,7 @@ onBeforeUnmount(() => {
       v-if="open"
       ref="menu"
       :style="menuStyle"
-      class="z-[60] overflow-y-auto rounded-sm border border-border-strong bg-card py-1 shadow-2xl"
+      class="z-[60] overflow-y-auto rounded-sm border border-border-strong bg-card py-1 shadow-[0_12px_32px_-10px_rgba(0,0,0,0.85)]"
       role="listbox"
     >
       <button
@@ -180,7 +180,7 @@ onBeforeUnmount(() => {
         role="option"
         :aria-selected="opt.value === model"
         :data-active="i === activeIndex"
-        class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] transition-colors"
+        class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[14px] transition-colors"
         :class="
           i === activeIndex
             ? 'bg-selection text-selection-foreground'

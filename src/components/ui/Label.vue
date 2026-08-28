@@ -6,7 +6,7 @@ const props = defineProps<{ class?: string; for?: string }>();
 <template>
   <label
     :for="props.for"
-    :class="cn('text-[13px] leading-none text-foreground/90', props.class)"
+    :class="cn('text-[14px] leading-none text-foreground/90', props.class)"
   >
     <slot />
   </label>

@@ -3,30 +3,37 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
-   Prism-Launcher-style dark theme.
-   Near-black Qt-desktop chrome: flat surfaces, thin 1px separators, tight
-   rhythm, blue desktop selection. No gradients, no soft shadows, no pills.
+   Prism chrome.
+   The launcher is a black prism: the model/API is the single white light, each
+   instance is one refracted band. Rules that follow from that image —
+     · surfaces are flat near-black, never gradients or blurred "glass";
+     · elevation is a 1px hairline, never a soft shadow — and nothing glows;
+     · radii stay at 2-4px so panels read as machined parts, not phone cards;
+     · the only colour on chrome is the theme's own --selection, on what is
+       selected or live; no second accent hue is invented on top of a palette;
+     · every machine-readable value (model id, path, engine, count) is mono.
+   Values here are the `prism-dark` baseline for first paint; the theme engine
+   (src/lib/theme.ts) overwrites them per theme.
    --------------------------------------------------------------------------- */
 @layer base {
   :root {
-    --background: 240 6% 7%;        /* window / main content */
-    --panel: 240 6% 9%;             /* raised: group boxes, detail pane */
-    --toolbar: 240 5% 11%;          /* top bar + status bar */
+    --background: 220 12% 5%; /* #0b0c0e — deep void, main canvas */
+    --panel: 216 12% 8%; /* #121417 — sidebar / dock / cards */
+    --toolbar: 216 12% 8%; /* top bar + status bar */
     --foreground: 220 12% 86%;
-    --card: 240 6% 9%;
+    --card: 216 12% 8%;
     --card-foreground: 220 12% 86%;
 
-    --muted: 240 5% 14%;
-    --muted-foreground: 220 6% 52%;
-    --accent: 240 5% 16%;           /* hover highlight */
-    --accent-foreground: 220 12% 92%;
-    --secondary: 240 5% 15%;
+    --muted: 220 12% 11%;
+    --muted-foreground: 220 7% 50%;
+    --accent: 220 15% 12%; /* #1a1d23 — hover / active surface */
+    --accent-foreground: 220 12% 93%;
+    --secondary: 220 13% 14%;
     --secondary-foreground: 220 12% 88%;
 
-    /* desktop selection blues */
-    --selection: 216 52% 52%;       /* focused grid tile fill */
+    --selection: 216 52% 52%;
     --selection-foreground: 210 40% 98%;
-    --selection-muted: 220 26% 26%; /* list-row highlight */
+    --selection-muted: 220 26% 20%;
     --link: 205 68% 64%;
 
     --primary: 216 52% 52%;
@@ -34,9 +41,9 @@
     --destructive: 0 60% 52%;
     --destructive-foreground: 210 20% 96%;
 
-    --border: 240 5% 18%;
-    --border-strong: 240 5% 24%;
-    --input: 240 6% 12%;
+    --border: 220 10% 15%; /* the 1px hairline (~white/10 over the void) */
+    --border-strong: 220 10% 23%;
+    --input: 220 12% 7%;
     --ring: 216 52% 52%;
     --radius: 0.25rem;
   }
@@ -56,37 +63,80 @@ body,
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto,
-    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 13px;
+  /* Latin from a neutral geometric grotesk, CJK from 思源黑体 / Noto Sans SC.
+     Named explicitly rather than via system-ui, because fontconfig's default
+     sans on this host resolves to a decorative face. */
+  font-family: "Adwaita Sans", Inter, "Segoe UI Variable Text", "Segoe UI",
+    "Noto Sans", "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC",
+    "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  /* 500 rather than 450: the CJK faces here are static cuts (Noto Sans SC
+     Medium, YaHei), so an in-between weight would snap back to Regular and the
+     Chinese labels would stay thin while the Latin thickened. */
+  font-weight: 500;
+  font-feature-settings: "cv05", "ss01";
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overflow: hidden;
   user-select: none;
+}
+
+/* Machine-readable values stay copyable even though the shell is not. */
+.selectable {
+  user-select: text;
+  cursor: text;
 }
 
 ::selection {
   background: hsl(var(--selection) / 0.55);
 }
 
-/* thin Qt-like scrollbars */
+/* Thin desktop scrollbars — no rounded pills, no overlay tricks. */
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--border-strong));
-  border: 3px solid hsl(var(--background));
-  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 0;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(240 5% 32%);
+  background: hsl(var(--muted-foreground) / 0.7);
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
-/* mnemonic underline used across toolbar / action buttons */
+/* Mnemonic underline used across toolbar / action rows. */
 .mnemonic {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* Keycap chip. A physical key, so: flat, 1px, mono, never a colored pill. */
+.kbd {
+  display: inline-flex;
+  min-width: 15px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid hsl(var(--border-strong));
+  border-radius: 2px;
+  background: hsl(var(--background) / 0.6);
+  padding: 0 3px;
+  font-family: theme("fontFamily.mono");
+  font-size: 11px;
+  line-height: 15px;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Focus ring: one hairline in the theme's ring colour, nothing bloomy. */
+:focus-visible {
+  outline: 1px solid hsl(var(--ring) / 0.8);
+  outline-offset: -1px;
 }

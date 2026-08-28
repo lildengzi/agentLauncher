@@ -69,31 +69,32 @@ const mocha: ThemeVars = {
   "--ring": "217 92% 76%",
 };
 
-// Prism Launcher near-black dark (the reference chrome).
+// Prism Void — the reference chrome and the default. Hex anchors:
+// #0b0c0e canvas · #121417 panel/dock · #1a1d23 hover · emerald refraction edge.
 const prismDark: ThemeVars = {
-  "--background": "240 6% 7%",
-  "--panel": "240 6% 9%",
-  "--toolbar": "240 5% 11%",
+  "--background": "220 12% 5%",
+  "--panel": "216 12% 8%",
+  "--toolbar": "216 12% 8%",
   "--foreground": "220 12% 86%",
-  "--card": "240 6% 9%",
+  "--card": "216 12% 8%",
   "--card-foreground": "220 12% 86%",
-  "--muted": "240 5% 14%",
-  "--muted-foreground": "220 6% 52%",
-  "--accent": "240 5% 16%",
-  "--accent-foreground": "220 12% 92%",
-  "--secondary": "240 5% 15%",
+  "--muted": "220 12% 11%",
+  "--muted-foreground": "220 7% 50%",
+  "--accent": "220 15% 12%",
+  "--accent-foreground": "220 12% 93%",
+  "--secondary": "220 13% 14%",
   "--secondary-foreground": "220 12% 88%",
   "--selection": "216 52% 52%",
   "--selection-foreground": "210 40% 98%",
-  "--selection-muted": "220 26% 26%",
+  "--selection-muted": "220 26% 20%",
   "--link": "205 68% 64%",
   "--primary": "216 52% 52%",
   "--primary-foreground": "210 40% 98%",
   "--destructive": "0 60% 52%",
   "--destructive-foreground": "210 20% 96%",
-  "--border": "240 5% 18%",
-  "--border-strong": "240 5% 24%",
-  "--input": "240 6% 12%",
+  "--border": "220 10% 15%",
+  "--border-strong": "220 10% 23%",
+  "--input": "220 12% 7%",
   "--ring": "216 52% 52%",
 };
 
@@ -406,8 +407,9 @@ const githubLight: ThemeVars = {
 };
 
 export const themes: Theme[] = [
+  // Prism Void first: it is the default, and getTheme() falls back to themes[0].
+  { id: "prism-dark", label: "Prism Void", dark: true, vars: prismDark },
   { id: "catppuccin-mocha", label: "Catppuccin Mocha", dark: true, vars: mocha },
-  { id: "prism-dark", label: "Prism Dark", dark: true, vars: prismDark },
   { id: "catppuccin-macchiato", label: "Catppuccin Macchiato", dark: true, vars: macchiato },
   { id: "catppuccin-frappe", label: "Catppuccin Frappé", dark: true, vars: frappe },
   { id: "catppuccin-latte", label: "Catppuccin Latte", dark: false, vars: latte },
@@ -421,7 +423,7 @@ export const themes: Theme[] = [
   { id: "github-light", label: "GitHub Light", dark: false, vars: githubLight },
 ];
 
-export const DEFAULT_THEME = "catppuccin-mocha";
+export const DEFAULT_THEME = "prism-dark";
 
 export function getTheme(id: string): Theme {
   return themes.find((t) => t.id === id) ?? themes[0];

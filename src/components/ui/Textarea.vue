@@ -12,7 +12,7 @@ const model = defineModel<string>();
     @input="model = ($event.target as HTMLTextAreaElement).value"
     :class="
       cn(
-        'flex min-h-[80px] w-full rounded-sm border border-input bg-[hsl(var(--input))] px-2.5 py-2 text-[13px] leading-relaxed transition-colors placeholder:text-muted-foreground focus:border-selection focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45',
+        'flex min-h-[80px] w-full rounded-sm border border-input bg-[hsl(var(--input))] px-2.5 py-2 text-[14px] leading-relaxed transition-colors placeholder:text-muted-foreground focus:border-selection focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45',
         props.class
       )
     "

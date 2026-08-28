@@ -32,6 +32,7 @@ const zh: Dict = {
   "top.folder": "文件夹",
   "top.settings": "设置",
   "top.help": "帮助",
+  "top.account": "账户",
   // grid / empty
   "grid.empty.title": "还没有实例",
   "grid.empty.hint": "点击左上角「添加实例」创建你的第一个 Agent",
@@ -178,6 +179,7 @@ const en: Dict = {
   "top.folder": "Folders",
   "top.settings": "Settings",
   "top.help": "Help",
+  "top.account": "Account",
   "grid.empty.title": "No instances yet",
   "grid.empty.hint": "Click “Add Instance” in the top-left to create your first agent",
   "grid.running": "Running",

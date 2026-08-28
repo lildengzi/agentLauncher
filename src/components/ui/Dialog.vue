@@ -29,13 +29,13 @@ function close() {
     >
       <div
         v-if="open"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-6"
         @click.self="close"
       >
         <div
           :class="
             cn(
-              'relative w-full max-h-[92vh] overflow-hidden flex flex-col rounded-md border border-border-strong bg-background shadow-2xl',
+              'relative w-full max-h-[92vh] overflow-hidden flex flex-col rounded-sm border border-border-strong bg-background shadow-[0_16px_48px_-12px_rgba(0,0,0,0.85)]',
               props.width,
               props.class
             )
@@ -43,10 +43,10 @@ function close() {
         >
           <div
             v-if="title || $slots.header"
-            class="flex items-center justify-between border-b border-border bg-toolbar px-4 py-2.5"
+            class="flex items-center justify-between border-b border-border bg-toolbar px-3 py-2"
           >
             <slot name="header">
-              <h2 class="text-[15px] font-semibold text-foreground">{{ title }}</h2>
+              <h2 class="text-[14px] font-semibold text-foreground">{{ title }}</h2>
             </slot>
             <button
               class="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -62,7 +62,7 @@ function close() {
 
           <div
             v-if="$slots.footer"
-            class="flex items-center gap-2 border-t border-border bg-toolbar px-4 py-2.5"
+            class="flex items-center gap-2 border-t border-border bg-toolbar px-3 py-2"
           >
             <slot name="footer" />
           </div>
