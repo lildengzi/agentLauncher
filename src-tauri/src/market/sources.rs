@@ -75,11 +75,19 @@ impl Default for SourcesDoc {
 
 /// The rows every install starts with.
 ///
-/// Deliberately short. A default that 404s teaches users the market is broken, so
-/// only a feed we actually fetch today ships enabled, plus the local directory,
-/// which cannot fail. The MCP registry row is present but **off**: its endpoint and
-/// payload shape still need verifying against the live service before we point
-/// users at it.
+/// Deliberately short. A default that 404s teaches users the market is broken, so a
+/// row only ships enabled once its endpoint and payload shape have been checked
+/// against the live service — which is now true of all three:
+///
+/// * `dsh-market` — `GET /plugins.json` answers 200 with `schemaVersion: 2` and a
+///   `plugins` array (4753 entries at the time of writing, `Cache-Control: max-age=600`,
+///   which is where `FRESH_TTL_SECS` comes from).
+/// * `local` — a directory read, so it cannot 404; a missing directory is an empty
+///   list rather than a failure.
+/// * `mcp-registry` — `GET /v0/servers?limit=100` answers 200 with `servers[]` and a
+///   `metadata.nextCursor`, schema `2025-12-11`; entries are `{server, _meta}` and the
+///   packages we can actually install are the `transport.type == "stdio"` npm/pypi ones.
+///   The `mcp-registry` adapter is written against that shape, so the row ships on.
 pub fn builtins() -> Vec<SourceDef> {
     vec![
         SourceDef {
@@ -107,10 +115,12 @@ pub fn builtins() -> Vec<SourceDef> {
             id: "mcp-registry".into(),
             label: "MCP Registry".into(),
             kind: "http".into(),
+            // No `limit` here on purpose: the adapter's paging appends its own, and a
+            // user who re-points this row keeps whatever query they typed.
             url: "https://registry.modelcontextprotocol.io/v0/servers".into(),
             adapter: "mcp-registry".into(),
             kinds: vec!["mcp".into()],
-            enabled: false,
+            enabled: true,
             builtin: true,
         },
     ]
@@ -199,6 +209,7 @@ mod tests {
         let doc = load().unwrap();
         assert_eq!(doc.format_version, 1);
         assert!(doc.sources.iter().all(|s| s.builtin));
+        assert!(doc.sources.iter().all(|s| s.enabled), "every shipped row is verified");
         assert!(doc.sources.iter().any(|s| s.id == "dsh-market" && s.enabled));
         // Only sources declaring a kind answer that dialog.
         let mcp: Vec<&str> = doc
