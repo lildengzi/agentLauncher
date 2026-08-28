@@ -40,3 +40,5 @@ agent-default-model:
 ## 分组与图标 · Groups & icons
 
 `instance.json` 的 `group` 决定网格分组标题，`icon` 决定卡片图标 —— 纯展示，不影响运行。
+
+**成员归属的唯一真相是 `instance.json.group`**；分组的**表现层**（组顺序、折叠状态、组内手动排序）另落在 `~/.agentlauncher/instgroups.json`，是一层覆盖而非真相——引用了过期实例会被静默忽略，缺席的实例按名追加，绝不因此把真实实例藏起来。详见 [Launcher Anatomy](Launcher-Anatomy)。

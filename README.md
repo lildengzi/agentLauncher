@@ -1,13 +1,19 @@
 <div align="center">
 
-# 🔷 agentLauncher
+<img src="src-tauri/icons/128x128@2x.png" alt="agentLauncher logo" width="128" height="128">
+
+# agentLauncher
 
 **Manage AI agents the way Prism Launcher manages Minecraft instances.**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?logo=openSourceInitiative&logoColor=white)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org)
 [![Rust](https://img.shields.io/badge/Rust-stable-000000?logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![Engine](https://img.shields.io/badge/engine-DeepSeek%20Harness%20(dsh)-5b9dff)](docs/wiki/Architecture.md)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-606060?logo=windows&logoColor=white)](https://github.com/lildengzi/agentLauncher/releases)
+[![Release](https://img.shields.io/github/v/release/lildengzi/agentLauncher?include_prereleases&display_name=tag&label=release&color=0ea5e9)](https://github.com/lildengzi/agentLauncher/releases)
+[![CI](https://github.com/lildengzi/agentLauncher/actions/workflows/ci.yml/badge.svg)](https://github.com/lildengzi/agentLauncher/actions)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 ![Status](https://img.shields.io/badge/status-MVP%20v0.1.0-e8963a)
 
 **[中文](README_zh.md)**
@@ -25,11 +31,11 @@
 
 ---
 
-> One engine, a whole shelf of agents.
+> Six engines, a whole shelf of agents.
 
-`agentLauncher` is a graphical launcher for AI agents, built on **Prism Launcher's isolation philosophy**. It treats each agent as an isolated *instance* — its own sandboxed directory, model, plugins and keys — and runs it with a single **Launch**.
+`agentLauncher` is a graphical launcher for AI agents, built on **Prism Launcher's isolation philosophy**. It treats each agent as an isolated *instance* — its own sandboxed directory, model, plugins and keys — and runs it with a single **Launch**. One `runtime.engine` per instance picks the CLI: `dsh` · `pi` · `omp` · `claude` · `codex` · `opencode`.
 
-It only **manages**; it never intercepts the chat: interaction happens in **dsh's own web page**.
+It only **manages**; it never intercepts the chat: `dsh` web instances interact in **dsh's own web page**, the other five engines run as headless one-shots — the launcher is just the hand that starts whichever CLI you picked (see [Architecture](docs/wiki/Architecture.md)).
 
 ### ✨ Highlights
 
@@ -47,8 +53,8 @@ It only **manages**; it never intercepts the chat: interaction happens in **dsh'
 One agent = one directory. No hidden global state — open the folder and you see everything that agent is:
 
 ```text
-~/.dsh-launcher/instances/web-baseline/
-├─ instance.json   # metadata: name · icon · group · model · temperature · thinking_budget
+~/.agentlauncher/instances/web-baseline/
+├─ instance.json   # metadata: name · icon · group · profile · runtime.engine · model ...
 ├─ AGENTS.md       # this instance's system prompt & rules
 ├─ mcp.json        # enabled MCP (Model Context Protocol) plugins
 ├─ .env            # this instance's API keys & env vars (isolated injection)
@@ -68,21 +74,29 @@ pnpm tauri build      # bundle the desktop app
 ```
 
 1. **Install dsh first** — the launcher is only a shell; DeepSeek Harness does the work.
-2. **Create an instance** — hit *Add instance*, pick the web profile and a model; the folder is created under `~/.dsh-launcher/`.
+2. **Create an instance** — hit *Add instance*, pick the web profile and a model; the folder is created under `~/.agentlauncher/`.
 3. **Launch & chat** — press *Launch*; the browser opens dsh's web page. History stays in the instance's `workspace/`.
 
 > 📄 A GitHub-Pages-ready landing page ships in the repo: [`docs/landing.html`](docs/landing.html).
 
 ### 🏗 How it works
 
-A light shell that runs the engine. **Tauri 2 (Rust)** manages subprocesses, the file sandbox and credentials; the **DeepSeek Harness (`dsh` CLI)** is the actual engine.
+A light shell that runs **any of six agent CLIs**. **Tauri 2 (Rust)** manages subprocesses, the file sandbox and credentials; the six `AgentRuntime` adapters — `dsh` · `pi` · `omp` · `claude` · `codex` · `opencode` — all live in `src-tauri/src/runtime/model.rs:1` and are dispatched by `runtime::for_instance` (`src-tauri/src/runtime/mod.rs:71`). `dsh` is the only engine with a web serve mode; the other five run as headless one-shots.
 
-- **Run shape is derived from the profile**: if the profile's `bundles` include `@deepseek-ai/dsh-web-app`, the launcher starts a web server, grabs a port and opens the browser; otherwise it runs a one-shot task.
+- **Run shape is derived from the engine + profile**: `dsh` web-capable profiles (bundles include `@deepseek-ai/dsh-web-app`) start a server, grab a port and open the browser; everything else runs a one-shot task (`-p` / `exec` / `run` depending on the engine, see [Instance Anatomy](docs/wiki/Instance-Anatomy.md#自由组合--框架--llm)).
 - **Front/back contract**: `src/types.ts` mirrors the Rust structs; `src/lib/api.ts` wraps every `invoke` command and the `dsh-log` / `dsh-status` events.
 
 ### 🙏 Acknowledgements
 
 - **[Prism Launcher](https://prismlauncher.org/)** — inspiration for the instance-isolation philosophy and UI layout.
-- **DeepSeek Harness (`dsh`)** — the underlying agent execution engine.
+- **DeepSeek Harness (`dsh`) · pi · omp · Claude Code · Codex · opencode** — six supported CLIs (`src-tauri/src/runtime/model.rs:22`); `dsh` is first-class with web UI.
 
 > ⚠️ The UI is heavily inspired by Prism Launcher, but agentLauncher is an **independent project**, not affiliated with Prism Launcher, Mojang, or DeepSeek.
+
+### 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup and PR guidelines. Bug reports and feature requests via [Issues](https://github.com/lildengzi/agentLauncher/issues) (templates provided).
+
+### 📄 License
+
+[MIT](LICENSE) © 2026 lildengzi

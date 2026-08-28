@@ -1,11 +1,28 @@
 // Minimal reactive i18n. `t(key)` resolves against the active locale's dict,
-// falling back to the key itself. Locale persists to localStorage.
-import { ref, computed, readonly } from "vue";
+// falling back to the key itself. Source of truth is config.ui.locale (persisted
+// to ~/.agentlauncher/config.json); a localStorage cache is kept only for the
+// correct language on first paint before backend hydration lands.
+import { ref, computed, readonly, watch } from "vue";
+import { config } from "@/lib/launcherConfig";
 
 export type Locale = "zh" | "en";
 
-const STORAGE_KEY = "dsh-launcher.locale";
-const locale = ref<Locale>((localStorage.getItem(STORAGE_KEY) as Locale) || "zh");
+const FAST_CACHE = "agentlauncher.locale";
+const cached = localStorage.getItem(FAST_CACHE);
+const locale = ref<Locale>(cached === "en" ? "en" : "zh");
+
+// Mirror the source-of-truth locale into the reactive ref + first-paint cache.
+watch(
+  () => config.ui.locale,
+  (l) => {
+    locale.value = l === "en" ? "en" : "zh";
+    try {
+      localStorage.setItem(FAST_CACHE, locale.value);
+    } catch {
+      /* ignore */
+    }
+  }
+);
 
 type Dict = Record<string, string>;
 
@@ -67,22 +84,44 @@ const zh: Dict = {
   "settings.model.desc": "全局默认凭据。新建实例时预填，可在实例中覆盖。",
   "settings.model.save": "保存",
   "settings.model.saved": "已保存",
-  "settings.about.desc": "dsh Launcher — 基于 Tauri 的 dsh Agent 图形化启动器。",
+  "settings.about.desc": "agentLauncher — 基于 Tauri 的 dsh Agent 图形化启动器。",
   // edit dialog
   "edit.title.new": "新建实例",
   "edit.title.edit": "编辑实例",
   "edit.nav.general": "常规",
   "edit.nav.model": "模型",
+  "edit.nav.runtime": "运行时",
   "edit.nav.task": "任务与提示词",
   "edit.name": "名称",
   "edit.icon": "图标",
+  "edit.iconHint": "lucide 图标名，如 code / globe / flask-conical。",
   "edit.group": "分组",
   "edit.description": "描述",
-  "edit.profile": "dsh Profile",
+  "edit.profile": "Profile",
+  "edit.profileHint": "dsh 的配置档（`~/.dsh/profiles` 下每个目录一个），决定插件集；档内含 dsh 网页应用包时该实例即以交互式 web 运行——按档内容判断，不按名字。",
   "edit.model": "模型",
+  "edit.model.provider": "服务商 Provider",
+  "edit.model.providerHint": "LLM 供应商，与模型成对；命名因框架而异（如 pi 的 google、dsh 的 deepseek-official）。留空则用所选框架的默认。",
+  "edit.model.providerEnvOnly": "所选框架不接收 provider 参数：供应商、Base URL 与密钥均由实例 .env 里的 ANTHROPIC_* 决定。",
   "edit.temperature": "温度",
   "edit.thinking": "思考预算",
+  "edit.runtime.engine": "框架 / 引擎",
+  "edit.runtime.engineHint": "该实例使用的 Agent CLI；与 Provider + 模型自由组合。目前仅 dsh 提供 web 交互，其余为一次性任务（headless）。",
+  "edit.runtime.engineMissing": "未安装",
+  "edit.runtime.shape": "运行形态",
+  "edit.runtime.shape.headless": "一次性任务（headless）",
+  "edit.runtime.shape.web": "交互式（web）",
+  "edit.runtime.shapeHintProfile": "由下方该框架专属的 Profile 决定：含网页应用包的档以交互式 web 运行，否则为一次性任务。",
+  "edit.runtime.shapeHintNoWeb": "该框架只有一次性任务模式；目前只有 dsh 接了 web 交互。",
+  "edit.runtime.engineSpecific": "以下为该框架专属设置",
+  "edit.runtime.envPolicy": "环境策略",
+  "edit.runtime.autodetect": "自动探测（继承宿主 PATH）",
+  "edit.runtime.isolated": "隔离（最小 PATH）",
+  "edit.runtime.envPolicyHint": "自动探测：从登录 shell 补全 PATH，解决从图标启动时找不到 dsh/node 的问题；隔离：仅最小系统路径，不泄漏宿主工具链。",
+  "edit.runtime.customBin": "自定义二进制",
+  "edit.runtime.customBinHint": "该实例 Agent CLI 的绝对路径；留空则在 PATH 中查找所选框架的二进制。",
   "edit.defaultTask": "默认任务",
+  "edit.defaultTaskHint": "留空则启动时使用通用默认任务。",
   "edit.save": "保存",
   "edit.cancel": "取消",
   // hub
@@ -188,21 +227,43 @@ const en: Dict = {
   "settings.model.desc": "Global default credentials. Prefilled for new instances; can be overridden per instance.",
   "settings.model.save": "Save",
   "settings.model.saved": "Saved",
-  "settings.about.desc": "dsh Launcher — a Tauri GUI launcher for dsh agents.",
+  "settings.about.desc": "agentLauncher — a Tauri GUI launcher for dsh agents.",
   "edit.title.new": "New Instance",
   "edit.title.edit": "Edit Instance",
   "edit.nav.general": "General",
   "edit.nav.model": "Model",
+  "edit.nav.runtime": "Runtime",
   "edit.nav.task": "Task & Prompt",
   "edit.name": "Name",
   "edit.icon": "Icon",
+  "edit.iconHint": "A lucide icon name, e.g. code / globe / flask-conical.",
   "edit.group": "Group",
   "edit.description": "Description",
-  "edit.profile": "dsh Profile",
+  "edit.profile": "Profile",
+  "edit.profileHint": "A dsh config profile (one directory each under `~/.dsh/profiles`) deciding its plugin set. A profile bundling the dsh web app runs this instance interactively — decided by contents, not by name.",
   "edit.model": "Model",
+  "edit.model.provider": "Provider",
+  "edit.model.providerHint": "LLM provider, paired with the model. Naming is framework-specific (e.g. pi's \"google\", dsh's \"deepseek-official\"). Leave empty to use the selected framework's default.",
+  "edit.model.providerEnvOnly": "The selected framework takes no provider argument: provider, base URL, and key all come from ANTHROPIC_* in the instance .env.",
   "edit.temperature": "Temperature",
   "edit.thinking": "Thinking budget",
+  "edit.runtime.engine": "Framework / engine",
+  "edit.runtime.engineHint": "The agent CLI this instance runs; freely combine it with a provider + model. Only dsh offers web interaction for now — the others run one-shot (headless).",
+  "edit.runtime.engineMissing": "not installed",
+  "edit.runtime.shape": "Run mode",
+  "edit.runtime.shape.headless": "One-shot task (headless)",
+  "edit.runtime.shape.web": "Interactive (web)",
+  "edit.runtime.shapeHintProfile": "Decided by this framework's own Profile below: a profile bundling the web app runs interactively, otherwise it is a one-shot task.",
+  "edit.runtime.shapeHintNoWeb": "This framework only runs one-shot tasks; web interaction is wired for dsh alone today.",
+  "edit.runtime.engineSpecific": "Settings specific to this framework",
+  "edit.runtime.envPolicy": "Env policy",
+  "edit.runtime.autodetect": "Autodetect (inherit host PATH)",
+  "edit.runtime.isolated": "Isolated (minimal PATH)",
+  "edit.runtime.envPolicyHint": "Autodetect enriches PATH from your login shell, fixing \"dsh not found\" when launched from the app icon. Isolated uses a minimal system PATH and does not leak the host toolchain.",
+  "edit.runtime.customBin": "Custom binary",
+  "edit.runtime.customBinHint": "Absolute path to this instance's agent CLI; leave empty to find the selected framework's binary on PATH.",
   "edit.defaultTask": "Default task",
+  "edit.defaultTaskHint": "Leave empty to use the generic default task at launch.",
   "edit.save": "Save",
   "edit.cancel": "Cancel",
   "hub.title": "Plugin / MCP Market",
@@ -257,8 +318,7 @@ const en: Dict = {
 const dicts: Record<Locale, Dict> = { zh, en };
 
 export function setLocale(l: Locale): void {
-  locale.value = l;
-  localStorage.setItem(STORAGE_KEY, l);
+  config.ui.locale = l; // ref + cache update via the watcher above; persisted by launcherConfig
 }
 
 export function useI18n() {

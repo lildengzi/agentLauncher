@@ -15,6 +15,7 @@ import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import Badge from "@/components/ui/Badge.vue";
 import Avatar from "@/components/ui/Avatar.vue";
+import Select, { type SelectOption } from "@/components/ui/Select.vue";
 import { api } from "@/lib/api";
 import { brandForProvider, type Brand } from "@/lib/brand";
 import { useI18n } from "@/lib/i18n";
@@ -51,6 +52,14 @@ const query = ref("");
 const debouncedQuery = ref("");
 const view = ref<View>("recommend");
 const sortBy = ref<"relevance" | "score" | "newest">("relevance");
+const sortOptions = computed<SelectOption[]>(() => [
+  { value: "relevance", label: t("hub.sort.relevance") },
+  { value: "score", label: t("hub.sort.score") },
+  { value: "newest", label: t("hub.sort.newest") },
+]);
+function setSort(v: string): void {
+  sortBy.value = v as typeof sortBy.value;
+}
 const noConfigOnly = ref(false);
 const selectedTags = ref<string[]>([]);
 const selectedId = ref<string | null>(null);
@@ -278,14 +287,12 @@ async function copyCommand(p: MarketPlugin): Promise<void> {
       <div class="flex min-w-0 flex-1 flex-col border-r border-border">
         <div class="flex items-center gap-2 border-b border-border px-3 py-2">
           <Input v-model="query" :placeholder="t('hub.search')" class="flex-1" />
-          <select
-            v-model="sortBy"
-            class="rounded border border-border bg-input px-2 py-1.5 text-[12px] text-foreground"
-          >
-            <option value="relevance">{{ t('hub.sort.relevance') }}</option>
-            <option value="score">{{ t('hub.sort.score') }}</option>
-            <option value="newest">{{ t('hub.sort.newest') }}</option>
-          </select>
+          <Select
+            :model-value="sortBy"
+            :options="sortOptions"
+            class="w-auto shrink-0"
+            @update:model-value="setSort"
+          />
           <label class="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground">
             <input v-model="noConfigOnly" type="checkbox" class="accent-primary" />
             {{ t('hub.noConfig') }}

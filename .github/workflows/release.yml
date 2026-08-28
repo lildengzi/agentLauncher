@@ -26,56 +26,56 @@ jobs:
           - os: ubuntu-latest
             arch: x86_64
             target: x86_64-unknown-linux-gnu
-            artifact_name: dsh-launcher-linux-x86_64
+            artifact_name: agentlauncher-linux-x86_64
             asset_pattern: |
               target/release/bundle/deb/*.deb
               target/release/bundle/appimage/*.AppImage
-              target/release/dsh-launcher
+              target/release/agentlauncher
           # Linux aarch64 (ARM64) — native arm64 runner (free for public repos)
           - os: ubuntu-24.04-arm
             arch: aarch64
             target: aarch64-unknown-linux-gnu
-            artifact_name: dsh-launcher-linux-aarch64
+            artifact_name: agentlauncher-linux-aarch64
             asset_pattern: |
               target/aarch64-unknown-linux-gnu/release/bundle/deb/*.deb
               target/aarch64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-              target/aarch64-unknown-linux-gnu/release/dsh-launcher
+              target/aarch64-unknown-linux-gnu/release/agentlauncher
           # macOS x86_64 (Intel)
           - os: macos-latest
             arch: x86_64
             target: x86_64-apple-darwin
-            artifact_name: dsh-launcher-macos-x86_64
+            artifact_name: agentlauncher-macos-x86_64
             asset_pattern: |
               target/release/bundle/dmg/*.dmg
               target/release/bundle/macos/*.app
-              target/release/dsh-launcher
+              target/release/agentlauncher
           # macOS aarch64 (Apple Silicon)
           - os: macos-latest
             arch: aarch64
             target: aarch64-apple-darwin
-            artifact_name: dsh-launcher-macos-aarch64
+            artifact_name: agentlauncher-macos-aarch64
             asset_pattern: |
               target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
               target/aarch64-apple-darwin/release/bundle/macos/*.app
-              target/aarch64-apple-darwin/release/dsh-launcher
+              target/aarch64-apple-darwin/release/agentlauncher
           # Windows x86_64
           - os: windows-latest
             arch: x86_64
             target: x86_64-pc-windows-msvc
-            artifact_name: dsh-launcher-windows-x86_64
+            artifact_name: agentlauncher-windows-x86_64
             asset_pattern: |
               target/release/bundle/msi/*.msi
               target/release/bundle/nsis/*.exe
-              target/release/dsh-launcher.exe
+              target/release/agentlauncher.exe
           # Windows aarch64 (ARM64) — native windows-11-arm runner (free for public repos)
           - os: windows-11-arm
             arch: aarch64
             target: aarch64-pc-windows-msvc
-            artifact_name: dsh-launcher-windows-aarch64
+            artifact_name: agentlauncher-windows-aarch64
             asset_pattern: |
               target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi
               target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
-              target/aarch64-pc-windows-msvc/release/dsh-launcher.exe
+              target/aarch64-pc-windows-msvc/release/agentlauncher.exe
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -175,7 +175,7 @@ jobs:
           fi
 
           # Raw binary (zipped) for people who just want the executable.
-          zip -j "dist/dsh-launcher-${ARCH}-linux.zip" "${RELEASE_DIR}/dsh-launcher"
+          zip -j "dist/agentlauncher-${ARCH}-linux.zip" "${RELEASE_DIR}/agentlauncher"
 
           echo "== dist contents =="
           ls -lh dist/
@@ -192,13 +192,13 @@ jobs:
           # Native installer: .dmg (renamed per-arch so x86_64 and aarch64 don't collide)
           for dmg in "${RELEASE_DIR}/bundle/dmg/"*.dmg; do
             [ -e "$dmg" ] || continue
-            cp "$dmg" "dist/dsh-launcher-${ARCH}-macos.dmg"
+            cp "$dmg" "dist/agentlauncher-${ARCH}-macos.dmg"
           done
 
           # .app bundle (zipped, since .app is a directory)
           APP=$(ls -d "${RELEASE_DIR}/bundle/macos/"*.app 2>/dev/null | head -1)
           if [ -n "$APP" ]; then
-            (cd "$(dirname "$APP")" && zip -qr - "$(basename "$APP")") > "dist/dsh-launcher-${ARCH}-macos.zip"
+            (cd "$(dirname "$APP")" && zip -qr - "$(basename "$APP")") > "dist/agentlauncher-${ARCH}-macos.zip"
           fi
 
           echo "== dist contents =="
@@ -218,7 +218,7 @@ jobs:
           Copy-Item "${releaseDir}/bundle/nsis/*.exe" "dist/" -ErrorAction SilentlyContinue
 
           # Portable: zip of the raw executable
-          Compress-Archive -Path "${releaseDir}/dsh-launcher.exe" -DestinationPath "dist/dsh-launcher-${arch}-windows.zip" -Force
+          Compress-Archive -Path "${releaseDir}/agentlauncher.exe" -DestinationPath "dist/agentlauncher-${arch}-windows.zip" -Force
 
           Write-Host "== dist contents =="
           Get-ChildItem dist | Format-Table Name,Length

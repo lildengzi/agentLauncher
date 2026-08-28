@@ -3,9 +3,48 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// Per-instance runtime/environment override — mirrors `RuntimeConfig` in
+/// src/types.ts. Governs how the host resolves the agent binary and the child
+/// process PATH. All fields default, so an older `instance.json` without a
+/// `runtime` block reads as `autodetect` with no custom binary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeConfig {
+    /// Which agent CLI ("framework") to launch: "dsh" | "pi" | "omp" | "claude"
+    /// | "codex" | "opencode". Selects the `AgentRuntime` impl (see runtime::
+    /// for_instance). Missing/empty/unknown ⇒ "dsh" (backward compatible).
+    #[serde(default = "default_engine")]
+    pub engine: String,
+    /// "autodetect" — enrich the child PATH from the host login shell; or
+    /// "isolated" — a minimal deterministic PATH that does not leak the host
+    /// toolchain. Kept as a String (like `profile`) and validated at use.
+    #[serde(default = "default_env_policy")]
+    pub env_policy: String,
+    /// Absolute path to this instance's agent CLI; when non-empty it overrides
+    /// the PATH lookup for the binary and its directory is added to PATH.
+    #[serde(default)]
+    pub custom_bin: String,
+}
+fn default_engine() -> String {
+    "dsh".to_string()
+}
+fn default_env_policy() -> String {
+    "autodetect".to_string()
+}
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self {
+            engine: default_engine(),
+            env_policy: default_env_policy(),
+            custom_bin: String::new(),
+        }
+    }
+}
+
 /// One Agent instance — mirrors `Instance` in src/types.ts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instance {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub id: String,
     pub name: String,
     pub icon: String,
@@ -14,6 +53,11 @@ pub struct Instance {
     pub description: String,
     #[serde(default = "default_profile")]
     pub profile: String,
+    /// LLM provider ("the other half" of the model). Meaning is engine-specific
+    /// (dsh's `deepseek-official` ≠ pi's `google`); the launcher passes it
+    /// through verbatim to the selected engine. Missing ⇒ empty (engine default).
+    #[serde(default)]
+    pub provider: String,
     #[serde(default)]
     pub model: String,
     #[serde(default)]
@@ -22,6 +66,8 @@ pub struct Instance {
     pub thinking_budget: u32,
     #[serde(default)]
     pub default_task: String,
+    #[serde(default)]
+    pub runtime: RuntimeConfig,
     pub created_at: String,
 }
 
@@ -38,6 +84,8 @@ pub struct NewInstance {
     #[serde(default = "default_profile")]
     pub profile: String,
     #[serde(default)]
+    pub provider: String,
+    #[serde(default)]
     pub model: String,
     #[serde(default)]
     pub temperature: f32,
@@ -45,6 +93,8 @@ pub struct NewInstance {
     pub thinking_budget: u32,
     #[serde(default)]
     pub default_task: String,
+    #[serde(default)]
+    pub runtime: RuntimeConfig,
 }
 
 fn default_profile() -> String {
@@ -53,11 +103,13 @@ fn default_profile() -> String {
 fn default_icon() -> String {
     "bot".to_string()
 }
+fn default_schema_version() -> u32 {
+    1
+}
 
-/// `~/.dsh-launcher/instances`
+/// `~/.agentlauncher/instances`
 pub fn instances_root() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("cannot resolve home directory")?;
-    Ok(home.join(".dsh-launcher").join("instances"))
+    Ok(crate::launcher_config::agentlauncher_root()?.join("instances"))
 }
 
 pub fn instance_dir(id: &str) -> Result<PathBuf, String> {
@@ -149,16 +201,19 @@ pub fn create_instance(payload: NewInstance) -> Result<Instance, String> {
     };
 
     let inst = Instance {
+        schema_version: default_schema_version(),
         id: id.clone(),
         name: payload.name,
         icon: payload.icon,
         group,
         description: payload.description,
         profile: payload.profile,
+        provider: payload.provider,
         model: payload.model,
         temperature: payload.temperature,
         thinking_budget: payload.thinking_budget,
         default_task: payload.default_task,
+        runtime: payload.runtime,
         created_at: Utc::now().to_rfc3339(),
     };
 
@@ -166,7 +221,7 @@ pub fn create_instance(payload: NewInstance) -> Result<Instance, String> {
 
     // Default scaffold files.
     let agents_md = format!(
-        "# {}\n\n你是一个运行在 dsh-launcher 沙箱中的 AI Agent。\n\n## 行为守则\n- 只在 workspace/ 目录内进行文件读写。\n- 执行高危命令前请说明意图。\n",
+        "# {}\n\n你是一个运行在 agentlauncher 沙箱中的 AI Agent。\n\n## 行为守则\n- 只在 workspace/ 目录内进行文件读写。\n- 执行高危命令前请说明意图。\n",
         inst.name
     );
     fs::write(dir.join("AGENTS.md"), agents_md).map_err(|e| e.to_string())?;
@@ -193,4 +248,101 @@ pub fn delete_instance(id: &str) -> Result<(), String> {
         fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::{temp_tree, EnvGuard, HOME_LOCK};
+
+    #[test]
+    fn create_web_instance_scaffold_under_agentlauncher_home() {
+        let _g = HOME_LOCK.lock().unwrap();
+        let tree = temp_tree("home");
+        let home = tree.path();
+        let _home_env = EnvGuard::set("HOME", home);
+
+        let inst = create_instance(NewInstance {
+            name: "Web E2E".into(),
+            icon: default_icon(),
+            group: String::new(),
+            description: String::new(),
+            profile: "web".into(),
+            provider: String::new(),
+            model: String::new(),
+            temperature: 0.0,
+            thinking_budget: 0,
+            default_task: String::new(),
+            runtime: RuntimeConfig::default(),
+        })
+        .expect("create_instance should succeed");
+
+        assert_eq!(inst.profile, "web");
+
+        let dir = instance_dir(&inst.id).unwrap();
+        // Data lives under the renamed ~/.agentlauncher tree.
+        assert!(
+            dir.starts_with(home.join(".agentlauncher")),
+            "instance dir {dir:?} must live under ~/.agentlauncher"
+        );
+        for f in ["instance.json", "AGENTS.md", ".env", "mcp.json"] {
+            assert!(dir.join(f).exists(), "missing scaffold file {f}");
+        }
+        for d in ["workspace", "skills", "logs"] {
+            assert!(dir.join(d).is_dir(), "missing scaffold dir {d}");
+        }
+        // The agent system prompt reflects the rename.
+        let agents = fs::read_to_string(dir.join("AGENTS.md")).unwrap();
+        assert!(
+            agents.contains("agentlauncher"),
+            "AGENTS.md should reference agentlauncher"
+        );
+        // Round-trips through the read path used by the UI.
+        assert_eq!(get_instance(&inst.id).unwrap().id, inst.id);
+        assert!(list_instances().unwrap().iter().any(|i| i.id == inst.id));
+    }
+
+    /// An older `instance.json` written before schema versioning omits the field;
+    /// it must deserialize to schema_version 1 (backward compatible).
+    #[test]
+    fn instance_missing_schema_version_defaults_to_1() {
+        let json = r#"{"id":"x","name":"X","icon":"bot","group":"g","profile":"headless","created_at":"1970-01-01T00:00:00Z"}"#;
+        let inst: Instance = serde_json::from_str(json).unwrap();
+        assert_eq!(inst.schema_version, 1);
+    }
+
+    /// An `instance.json` written before the runtime/environment override omits
+    /// the `runtime` block; it must deserialize to the autodetect default with
+    /// no custom binary (backward compatible, no schema bump needed).
+    #[test]
+    fn instance_missing_runtime_defaults() {
+        let json = r#"{"id":"x","name":"X","icon":"bot","group":"g","profile":"headless","created_at":"1970-01-01T00:00:00Z"}"#;
+        let inst: Instance = serde_json::from_str(json).unwrap();
+        assert_eq!(inst.runtime.env_policy, "autodetect");
+        assert!(inst.runtime.custom_bin.is_empty());
+    }
+
+    /// An `instance.json` written before multi-engine omits `runtime.engine`
+    /// (and may omit `runtime` entirely); it must default to the dsh engine so
+    /// existing instances keep launching dsh.
+    #[test]
+    fn runtime_missing_engine_defaults_to_dsh() {
+        // runtime present but without `engine`
+        let json = r#"{"id":"x","name":"X","icon":"bot","group":"g","profile":"headless","runtime":{"env_policy":"isolated","custom_bin":""},"created_at":"1970-01-01T00:00:00Z"}"#;
+        let inst: Instance = serde_json::from_str(json).unwrap();
+        assert_eq!(inst.runtime.engine, "dsh");
+        // runtime absent entirely
+        let json2 = r#"{"id":"x","name":"X","icon":"bot","group":"g","profile":"headless","created_at":"1970-01-01T00:00:00Z"}"#;
+        let inst2: Instance = serde_json::from_str(json2).unwrap();
+        assert_eq!(inst2.runtime.engine, "dsh");
+    }
+
+    /// An `instance.json` written before per-instance provider omits it; it must
+    /// deserialize to an empty provider (the engine then uses its own default).
+    #[test]
+    fn instance_missing_provider_defaults() {
+        let json = r#"{"id":"x","name":"X","icon":"bot","group":"g","profile":"headless","created_at":"1970-01-01T00:00:00Z"}"#;
+        let inst: Instance = serde_json::from_str(json).unwrap();
+        assert!(inst.provider.is_empty());
+    }
 }

@@ -1,7 +1,11 @@
 mod dsh_config;
+mod engines;
 mod executor;
 mod instance_manager;
+mod launcher_config;
 mod runtime;
+#[cfg(test)]
+mod test_support;
 
 use executor::RunnerState;
 use instance_manager::{Instance, NewInstance};
@@ -159,12 +163,17 @@ pub fn run() {
             open_instance_folder,
             open_url,
             list_mcp_catalog,
+            engines::detect_engines,
             dsh_config::list_credential_keys,
             dsh_config::set_credential,
             dsh_config::list_dsh_profiles,
             dsh_config::list_installed_plugins,
             dsh_config::plugin_add,
             dsh_config::plugin_remove,
+            launcher_config::get_launcher_config,
+            launcher_config::set_launcher_config,
+            launcher_config::get_inst_groups,
+            launcher_config::set_inst_groups,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

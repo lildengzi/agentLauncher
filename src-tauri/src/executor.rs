@@ -15,7 +15,6 @@ use tauri_plugin_opener::OpenerExt;
 use tokio::io::{AsyncReadExt, BufReader};
 use tokio::sync::mpsc;
 
-use crate::dsh_config;
 use crate::instance_manager;
 use crate::runtime::{self, SpawnRequest};
 
@@ -153,10 +152,13 @@ pub async fn start(
     let inst_dir = instance_manager::instance_dir(&id)?;
     let env_path = inst_dir.join(".env");
 
-    // A web-capable profile boots dsh's browser-UI server (long-running, prints a
-    // URL); anything else runs a one-shot task. The runtime assembles the matching
-    // command; here we only need to know whether to watch stdout for the URL.
-    let serve = dsh_config::profile_is_web_capable(&inst.profile);
+    // Resolve this instance's runtime (dsh/pi/omp/claude/codex/opencode) up front.
+    // The runtime owns binary/args/task-passing and per-run config overlays, and
+    // decides whether this run serves a long-running web UI (only dsh today) or
+    // answers a one-shot task; here we only need to know whether to watch stdout
+    // for the URL.
+    let agent = runtime::for_instance(&inst);
+    let serve = agent.is_serve(&inst);
 
     let task_text = task
         .filter(|t| !t.trim().is_empty())
@@ -171,10 +173,8 @@ pub async fn start(
 
     emit_status(&app, &id, "starting", None, None, None);
 
-    // Assemble the launch command via this instance's runtime (dsh today). The
-    // runtime owns binary/args/task-passing and per-run config overlays; the
-    // executor adds the generic cwd / env / stdio wiring below.
-    let agent = runtime::for_instance(&inst);
+    // Assemble the launch command via this instance's runtime. The executor adds
+    // the generic cwd / env / stdio wiring below.
     let mut cmd = match agent.build_command(&SpawnRequest {
         instance: &inst,
         instance_dir: &inst_dir,
@@ -186,14 +186,22 @@ pub async fn start(
             return Err(e);
         }
     };
-    cmd.current_dir(&workspace)
-        .envs(parse_env(&env_path))
+    cmd.current_dir(&workspace);
+    // Resolve the child PATH per this instance's env policy (autodetect enriches
+    // from the login shell; isolated stays minimal). Set it before layering the
+    // instance `.env`, so an explicit PATH there still wins as the most specific.
+    if let Some(path) =
+        runtime::env::resolve_child_path(&inst.runtime.env_policy, &inst.runtime.custom_bin).await
+    {
+        cmd.env("PATH", path);
+    }
+    cmd.envs(parse_env(&env_path))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
     let mut child = cmd.spawn().map_err(|e| {
-        let msg = format!("无法启动 dsh: {e}");
+        let msg = format!("无法启动 {}: {e}", agent.id());
         emit_status(&app, &id, "error", None, Some(msg.clone()), None);
         msg
     })?;
@@ -240,5 +248,31 @@ pub async fn stop(state: State<'_, RunnerState>, id: String) -> Result<(), Strin
         Ok(())
     } else {
         Err(format!("实例未在运行: {id}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_url;
+
+    #[test]
+    fn extracts_dsh_web_url() {
+        // The real startup line dsh prints for a web profile.
+        assert_eq!(
+            find_url("dsh web: http://127.0.0.1:37645\n").as_deref(),
+            Some("http://127.0.0.1:37645")
+        );
+        // https + trailing slash, terminated by following whitespace.
+        assert_eq!(
+            find_url("listening on https://0.0.0.0:3080/ now").as_deref(),
+            Some("https://0.0.0.0:3080/")
+        );
+        // A quote terminates the token.
+        assert_eq!(
+            find_url("url=\"http://x:1\" done").as_deref(),
+            Some("http://x:1")
+        );
+        // No URL present.
+        assert_eq!(find_url("starting, no url yet"), None);
     }
 }

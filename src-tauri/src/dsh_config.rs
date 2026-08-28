@@ -128,14 +128,26 @@ fn write_owner_only(home: &PathBuf, path: &PathBuf, body: &str) -> Result<(), St
     Ok(())
 }
 
-/// Profile names under `$DSH_HOME/profiles` (excludes `node_modules`).
+/// One dsh profile as the picker needs it — mirrors `DshProfile` in src/types.ts.
+///
+/// `web` is the launcher's real judgement (`profile_is_web_capable`), not a guess
+/// from the name: web-ness comes from the profile's bundled packages, so a profile
+/// called `daily` can be interactive and one called `web` need not be.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DshProfile {
+    pub name: String,
+    pub web: bool,
+}
+
+/// Profiles under `$DSH_HOME/profiles` (excludes `node_modules`), each with its
+/// web capability resolved.
 #[tauri::command]
-pub fn list_dsh_profiles() -> Result<Vec<String>, String> {
+pub fn list_dsh_profiles() -> Result<Vec<DshProfile>, String> {
     let dir = dsh_home()?.join("profiles");
     if !dir.exists() {
         return Ok(vec![]);
     }
-    let mut out = vec![];
+    let mut out: Vec<String> = vec![];
     for entry in fs::read_dir(&dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         if !entry.path().is_dir() {
@@ -149,7 +161,13 @@ pub fn list_dsh_profiles() -> Result<Vec<String>, String> {
         }
     }
     out.sort();
-    Ok(out)
+    Ok(out
+        .into_iter()
+        .map(|name| DshProfile {
+            web: profile_is_web_capable(&name),
+            name,
+        })
+        .collect())
 }
 
 fn profile_dir(profile: &str) -> Result<PathBuf, String> {

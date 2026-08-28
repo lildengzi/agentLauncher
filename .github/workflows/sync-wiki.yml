@@ -24,7 +24,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          # Wiki 源在 dsh-launcher/docs/wiki（本仓根即 dsh-launcher）
+          # Wiki 源在 agentlauncher/docs/wiki（本仓根即 agentlauncher）
           WIKI_SRC="docs/wiki"
           if [ ! -d "$WIKI_SRC" ]; then
             echo "找不到 $WIKI_SRC"; exit 1

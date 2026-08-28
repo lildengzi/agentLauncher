@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# sync-wiki.sh — 把 dsh-launcher/docs/wiki 同步到 GitHub Wiki
+# sync-wiki.sh — 把 agentlauncher/docs/wiki 同步到 GitHub Wiki
 # 用法: ./scripts/sync-wiki.sh [--dry-run]
 # 依赖: gh (已登录), git
-# 说明: 仅同步 dsh-launcher/docs/wiki/，外层 docs/ 是离线设计稿，刻意不并入 Wiki。
+# 说明: 仅同步 agentlauncher/docs/wiki/，外层 docs/ 是离线设计稿，刻意不并入 Wiki。
 set -euo pipefail
 
 REPO="lildengzi/agentLauncher"
@@ -20,7 +20,7 @@ if [[ "$HAS_WIKI" != "true" ]]; then
   gh api --method PATCH "repos/${REPO}" --field has_wiki=true --jq .has_wiki >/dev/null
 fi
 
-# 检查是否在正确目录（脚本位于 dsh-launcher/scripts/）
+# 检查是否在正确目录（脚本位于 agentlauncher/scripts/）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WIKI_SRC_ABS="${REPO_ROOT}/${WIKI_SRC}"

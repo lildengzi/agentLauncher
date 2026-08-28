@@ -5,7 +5,7 @@
 
 欢迎来到 **agentLauncher** 的文档。这里是把 [README](https://github.com/lildengzi/agentLauncher#readme) 之外的细节讲透的地方。
 
-> 🔗 **仓库 Wiki 地址**：`https://github.com/lildengzi/agentLauncher/wiki` · 本地源文件在 [`dsh-launcher/docs/wiki`](https://github.com/lildengzi/agentLauncher/tree/master/dsh-launcher/docs/wiki) ，通过 `gh` 同步（外层 `docs/` 为离线设计稿，刻意不并入 Wiki）。
+> 🔗 **仓库 Wiki 地址**：`https://github.com/lildengzi/agentLauncher/wiki` · 本地源文件在 [`agentlauncher/docs/wiki`](https://github.com/lildengzi/agentLauncher/tree/master/agentlauncher/docs/wiki) ，通过 `gh` 同步（外层 `docs/` 为离线设计稿，刻意不并入 Wiki）。
 
 ## 📚 导航 · Contents
 

@@ -15,7 +15,7 @@ defineProps<{
   <footer class="border-t border-border bg-toolbar text-[12px] text-muted-foreground">
     <div class="flex items-center gap-2 px-3 py-1">
       <Boxes class="h-3.5 w-3.5 opacity-80" />
-      <span class="font-medium text-foreground/80">dsh Launcher</span>
+      <span class="font-medium text-foreground/80">agentLauncher</span>
       <span class="opacity-70">dsh Core Engine {{ engineVersion }}</span>
       <div class="flex-1" />
       <span v-if="runningCount > 0" class="text-link">{{ t('status.runningN') }} {{ runningCount }}</span>

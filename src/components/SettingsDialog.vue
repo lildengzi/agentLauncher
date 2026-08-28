@@ -5,6 +5,7 @@ import Dialog from "@/components/ui/Dialog.vue";
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import GroupBox from "@/components/ui/GroupBox.vue";
+import Select, { type SelectOption } from "@/components/ui/Select.vue";
 import { useTheme } from "@/lib/theme";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { modelConfig, saveModelConfig, PROVIDERS } from "@/lib/settings";
@@ -31,6 +32,9 @@ const activeEnv = computed(
   () => PROVIDERS.find((p) => p.id === modelConfig.provider)?.apiKeyEnv ?? "DEEPSEEK_API_KEY"
 );
 const keyStored = computed(() => storedKeys.value.includes(activeEnv.value));
+const providerOptions = computed<SelectOption[]>(() =>
+  PROVIDERS.map((p) => ({ value: p.id, label: p.label }))
+);
 
 async function refreshKeys(): Promise<void> {
   try {
@@ -149,13 +153,11 @@ function pickProvider(id: string): void {
             <p class="mb-3 text-[12px] text-muted-foreground">{{ t('settings.model.desc') }}</p>
             <div class="grid grid-cols-[120px_1fr] items-center gap-x-3 gap-y-3">
               <label class="text-[13px] text-foreground/85">{{ t('settings.model.provider') }}</label>
-              <select
-                :value="modelConfig.provider"
-                class="h-8 rounded-sm border border-input bg-[hsl(var(--input))] px-2 text-[13px] focus:border-selection focus:outline-none"
-                @change="pickProvider(($event.target as HTMLSelectElement).value)"
-              >
-                <option v-for="p in PROVIDERS" :key="p.id" :value="p.id">{{ p.label }}</option>
-              </select>
+              <Select
+                :model-value="modelConfig.provider"
+                :options="providerOptions"
+                @update:model-value="pickProvider"
+              />
 
               <label class="text-[13px] text-foreground/85">{{ t('settings.model.apiKey') }}</label>
               <div class="flex flex-col gap-1">
@@ -192,7 +194,7 @@ function pickProvider(id: string): void {
 
         <!-- ABOUT -->
         <template v-else>
-          <GroupBox title="dsh Launcher">
+          <GroupBox title="agentLauncher">
             <p class="text-[13px] leading-relaxed text-foreground/85">{{ t('settings.about.desc') }}</p>
             <p class="mt-2 text-[12px] text-muted-foreground">Tauri 2 · Vue 3 · v0.1.0</p>
           </GroupBox>

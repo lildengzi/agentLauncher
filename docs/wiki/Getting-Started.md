@@ -31,7 +31,7 @@ cd src-tauri && cargo build
 
 1. 点顶部 **添加实例 (Add instance)**。
 2. 填名称、图标、分组；选 **profile**（如 `web`）与**模型**（如 `deepseek-v4-flash`）。
-3. 保存 —— 启动器会在 `~/.dsh-launcher/instances/<id>/` 下生成目录结构（`instance.json`、`AGENTS.md`、`.env`、`mcp.json`、`workspace/`、`skills/`、`logs/`）。
+3. 保存 —— 启动器会在 `~/.agentlauncher/instances/<id>/` 下生成目录结构（`instance.json`、`AGENTS.md`、`.env`、`mcp.json`、`workspace/`、`skills/`、`logs/`）。
 
 ## 4. 启动并对话 · Launch & chat
 

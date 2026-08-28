@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Instance, RunStatus } from "@/types";
 import { api, onDshStatus } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { config } from "@/lib/launcherConfig";
 import TopBar from "@/components/TopBar.vue";
 import InstanceGrid from "@/components/InstanceGrid.vue";
 import RightPanel from "@/components/RightPanel.vue";
@@ -55,9 +56,17 @@ const contextLine = computed(() => {
 async function loadInstances() {
   instances.value = await api.listInstances();
   if (!selectedId.value && instances.value.length) {
-    selectedId.value = instances.value[0].id;
+    // Restore the last selected instance from session state, if it still exists.
+    const saved = config.session.selected_instance;
+    const exists = saved && instances.value.some((i) => i.id === saved);
+    selectedId.value = exists ? saved : instances.value[0].id;
   }
 }
+
+// Persist the selection so the next launch reopens on the same instance.
+watch(selectedId, (id) => {
+  config.session.selected_instance = id ?? "";
+});
 
 onMounted(async () => {
   await loadInstances();
@@ -84,6 +93,8 @@ function openEdit() {
   }
 }
 async function onSaved(inst: Instance) {
+  // Remember the group for prefilling the next New Instance dialog.
+  config.session.last_used_group = inst.group;
   await loadInstances();
   selectedId.value = inst.id;
 }
@@ -130,9 +141,11 @@ async function duplicate() {
     group: s.group,
     description: s.description,
     profile: s.profile,
+    provider: s.provider,
     model: s.model,
     temperature: s.temperature,
     thinking_budget: s.thinking_budget,
+    runtime: { ...s.runtime },
     default_task: s.default_task,
   });
   await loadInstances();

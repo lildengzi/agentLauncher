@@ -1,25 +1,15 @@
-// Global launcher settings persisted to localStorage (model/API defaults).
-// The real dsh credential wiring lands on top of this; the GUI reads/writes
-// these values and (later) syncs them into instance .env / dsh config.
+// Global launcher model/API defaults. The non-secret fields mirror
+// config.defaults (persisted to ~/.agentlauncher/config.json via launcherConfig);
+// `apiKey` is transient and never persisted here — it goes to dsh's
+// ~/.dsh/.credentials.yaml (via api.setCredential).
 import { reactive, watch } from "vue";
+import { config } from "@/lib/launcherConfig";
 
 export interface ModelConfig {
   provider: string;
   apiKey: string;
   baseUrl: string;
   defaultModel: string;
-}
-
-const STORAGE_KEY = "dsh-launcher.modelConfig";
-
-function load(): ModelConfig {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...defaults(), ...JSON.parse(raw) };
-  } catch {
-    /* ignore */
-  }
-  return defaults();
 }
 
 function defaults(): ModelConfig {
@@ -31,22 +21,26 @@ function defaults(): ModelConfig {
   };
 }
 
-export const modelConfig = reactive<ModelConfig>(load());
+export const modelConfig = reactive<ModelConfig>(defaults());
 
+/** Push the editable non-secret fields into the launcher config (persisted). */
 export function saveModelConfig(): void {
-  // Never persist the secret to localStorage — API keys live in dsh's
-  // ~/.dsh/.credentials.yaml (written via api.setCredential). Only the
-  // non-secret preferences are cached here.
-  const safe = {
-    provider: modelConfig.provider,
-    baseUrl: modelConfig.baseUrl,
-    defaultModel: modelConfig.defaultModel,
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
+  config.defaults.provider = modelConfig.provider;
+  config.defaults.base_url = modelConfig.baseUrl;
+  config.defaults.model = modelConfig.defaultModel;
 }
 
-// keep persisted copy fresh on any change
-watch(modelConfig, () => saveModelConfig(), { deep: true });
+// Two-way binding with config.defaults. Equal-value writes are no-ops in Vue, so
+// the pair converges without looping. This also picks up backend hydration.
+watch(modelConfig, saveModelConfig, { deep: true });
+watch(
+  () => [config.defaults.provider, config.defaults.base_url, config.defaults.model] as const,
+  ([provider, baseUrl, model]) => {
+    modelConfig.provider = provider;
+    modelConfig.baseUrl = baseUrl;
+    modelConfig.defaultModel = model;
+  }
+);
 
 /** Known providers for the settings dropdown. OpenAI-compatible base URLs.
  *  `apiKeyEnv` is the credential reference dsh resolves (written to

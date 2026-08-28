@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { ChevronDown, ChevronRight } from "lucide-vue-next";
 import AppIcon from "@/components/ui/AppIcon.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import { brandForModel } from "@/lib/brand";
 import { useI18n } from "@/lib/i18n";
+import { applyOverlay, isCollapsed, toggleCollapsed } from "@/lib/instGroups";
 import type { Instance } from "@/types";
 
 const { t } = useI18n();
@@ -16,27 +17,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ select: [id: string]; activate: [id: string] }>();
 
-interface Group {
-  name: string;
-  items: Instance[];
-}
-
-const groups = computed<Group[]>(() => {
-  const map = new Map<string, Instance[]>();
-  for (const inst of props.instances) {
-    const bucket = map.get(inst.group);
-    if (bucket) bucket.push(inst);
-    else map.set(inst.group, [inst]);
-  }
-  return Array.from(map, ([name, items]) => ({ name, items }));
-});
-
-const collapsed = ref(new Set<string>());
-function toggle(name: string): void {
-  const next = new Set(collapsed.value);
-  next.has(name) ? next.delete(name) : next.add(name);
-  collapsed.value = next;
-}
+// Group order, collapse and intra-group ordering come from the persisted overlay
+// (instgroups.json); membership stays owned by each instance's `group` field.
+const groups = computed(() => applyOverlay(props.instances));
 
 function isRunning(id: string): boolean {
   return props.runningIds.includes(id);
@@ -59,15 +42,15 @@ function isRunning(id: string): boolean {
         <button
           type="button"
           class="group flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[13px] font-medium text-foreground/80 hover:text-foreground"
-          @click="toggle(group.name)"
+          @click="toggleCollapsed(group.name)"
         >
-          <ChevronRight v-if="collapsed.has(group.name)" class="h-4 w-4 opacity-70" />
+          <ChevronRight v-if="isCollapsed(group.name)" class="h-4 w-4 opacity-70" />
           <ChevronDown v-else class="h-4 w-4 opacity-70" />
           <span class="shrink-0">{{ group.name }}</span>
           <span class="ml-2 h-px flex-1 bg-border" />
         </button>
 
-        <div v-show="!collapsed.has(group.name)" class="flex flex-wrap gap-1 px-3 pb-3 pt-1">
+        <div v-show="!isCollapsed(group.name)" class="flex flex-wrap gap-1 px-3 pb-3 pt-1">
           <button
             v-for="inst in group.items"
             :key="inst.id"
