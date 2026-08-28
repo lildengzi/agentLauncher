@@ -518,7 +518,7 @@ const sortOptions = computed<SelectOption[]>(() => [
           <Button
             variant="outline"
             size="icon"
-            :title="t('common.retry')"
+            :title="t('market.refresh')"
             :disabled="loading || refreshing"
             @click="refresh"
           >
@@ -654,8 +654,8 @@ const sortOptions = computed<SelectOption[]>(() => [
       >
         {{ t("market.installError") }}: {{ opError }}
       </span>
-      <span v-else-if="busyKind === 'install'" class="text-[13px] text-muted-foreground">
-        {{ t("market.installing") }}
+      <span v-else-if="busyKind" class="text-[13px] text-muted-foreground">
+        {{ busyKind === "install" ? t("market.installing") : t("market.uninstalling") }}
       </span>
       <span
         v-else-if="note"
