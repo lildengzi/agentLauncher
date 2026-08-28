@@ -3,17 +3,19 @@
 > *Manage AI agents the way Prism Launcher manages Minecraft instances.*
 > 像 Prism Launcher 管理 Minecraft 实例一样，管理你的 AI Agent。
 
-欢迎来到 **agentLauncher** 的文档。这里是把 [README](../../README.md) 之外的细节讲透的地方。
+欢迎来到 **agentLauncher** 的文档。这里是把 [README](https://github.com/lildengzi/agentLauncher#readme) 之外的细节讲透的地方。
+
+> 🔗 **仓库 Wiki 地址**：`https://github.com/lildengzi/agentLauncher/wiki` · 本地源文件在 [`dsh-launcher/docs/wiki`](https://github.com/lildengzi/agentLauncher/tree/master/dsh-launcher/docs/wiki) ，通过 `gh` 同步（外层 `docs/` 为离线设计稿，刻意不并入 Wiki）。
 
 ## 📚 导航 · Contents
 
 | 页面 Page | 内容 |
 |---|---|
-| **[Getting Started](Getting-Started.md)** | 环境准备、构建、创建并启动第一个实例 |
-| **[Instance Anatomy](Instance-Anatomy.md)** | 一个实例目录里的每个文件到底是什么 |
-| **[Configuration](Configuration.md)** | profile · 模型 · 插件 · 凭据 · `.env` 怎么配 |
-| **[Architecture](Architecture.md)** | Tauri 外壳 + dsh 引擎 + 前后端契约 |
-| **[FAQ](FAQ.md)** | 常见问题与排障 |
+| **[Getting Started](Getting-Started)** | 环境准备、构建、创建并启动第一个实例 |
+| **[Instance Anatomy](Instance-Anatomy)** | 一个实例目录里的每个文件到底是什么 |
+| **[Configuration](Configuration)** | profile · 模型 · 插件 · 凭据 · `.env` 怎么配 |
+| **[Architecture](Architecture)** | Tauri 外壳 + dsh 引擎 + 前后端契约 |
+| **[FAQ](FAQ)** | 常见问题与排障 |
 
 ## 🧭 一分钟理解 · TL;DR
 

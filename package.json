@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "wiki:sync": "bash ./scripts/sync-wiki.sh",
+    "wiki:dry": "bash ./scripts/sync-wiki.sh --dry-run"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

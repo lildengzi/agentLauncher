@@ -1,0 +1,50 @@
+name: Sync Wiki
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "docs/wiki/**"
+      - ".github/workflows/sync-wiki.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push docs/wiki to Wiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # Wiki 源在 dsh-launcher/docs/wiki（本仓根即 dsh-launcher）
+          WIKI_SRC="docs/wiki"
+          if [ ! -d "$WIKI_SRC" ]; then
+            echo "找不到 $WIKI_SRC"; exit 1
+          fi
+          # GITHUB_TOKEN 对 wiki 有写权限（has_wiki=true 时）
+          WIKI_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          TMPDIR=$(mktemp -d)
+          if ! git clone "$WIKI_URL" "$TMPDIR" 2>&1; then
+            echo "Wiki 远端未初始化，本机 init"
+            git init "$TMPDIR"
+            git -C "$TMPDIR" remote add origin "$WIKI_URL"
+          fi
+          git -C "$TMPDIR" config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C "$TMPDIR" config user.name "github-actions[bot]"
+          find "$TMPDIR" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -v "$WIKI_SRC"/*.md "$TMPDIR"/
+          git -C "$TMPDIR" add -A
+          if git -C "$TMPDIR" diff --cached --quiet; then
+            echo "Wiki 无变化"
+            exit 0
+          fi
+          git -C "$TMPDIR" commit -m "docs(wiki): sync from $WIKI_SRC @ $GITHUB_SHA"
+          git -C "$TMPDIR" push origin HEAD:master || git -C "$TMPDIR" push origin HEAD:main
