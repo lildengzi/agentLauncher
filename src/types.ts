@@ -103,22 +103,6 @@ export interface RuntimeLogEvent {
   chunk: string;
 }
 
-/** A plugin/skill card in the Hub modal (mock catalog for the MVP). */
-export interface McpPlugin {
-  id: string;
-  name: string;
-  author: string;
-  /** real npm package name; present ⇒ install/remove operate on dsh for real. */
-  package?: string | null;
-  description: string;
-  /** lucide icon name for the row avatar. */
-  icon: string;
-  category: "modrinth" | "github" | "commercial";
-  version: string;
-  installed: boolean;
-  links: { label: string; url: string }[];
-}
-
 // ---------------------------------------------------------------------------
 // Launcher-level contract. Mirrors src-tauri/src/launcher_config.rs.
 // Two backend-owned versioned files under ~/.agentlauncher/:
@@ -170,3 +154,157 @@ export interface InstGroups {
   order: string[];
   groups: Record<string, GroupState>;
 }
+
+// ---------------------------------------------------------------------------
+// Per-instance extension state. Mirrors src-tauri/src/instance_ext.rs.
+// The three edit-dialog sections (扩展插件 / 技能 Skills / MCP 服务器) read this
+// in one call; each of the three lives wherever that kind of extension actually
+// lives, which is not uniformly per-instance — see `plugin_scope`.
+// ---------------------------------------------------------------------------
+
+/** One MCP server. `name` is the `mcpServers` map key in the instance's
+ *  `mcp.json`, carried inline so the UI edits a list rather than an object. */
+export interface McpServerEntry {
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  /** kept in the file but not handed to the engine. */
+  disabled: boolean;
+}
+
+/** One skill directory under `instances/<id>/skills/`. */
+export interface SkillEntry {
+  name: string;
+  /** absolute path, so the UI can reveal it without rebuilding it. */
+  path: string;
+  /** first prose line of the skill's own SKILL.md/README.md, or "". */
+  description: string;
+}
+
+export interface InstanceExtensions {
+  plugins: string[];
+  /** Who owns `plugins`: `"dsh-profile:<name>"` (shared by every instance on that
+   *  profile — the UI must say so) or `"unsupported"` for engines with no
+   *  readable plugin concept. */
+  plugin_scope: string;
+  skills: SkillEntry[];
+  mcp: McpServerEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Decentralized extension market. Mirrors src-tauri/src/market/{mod,sources}.rs.
+// No single registry exists, so every index is a row in ~/.agentlauncher/
+// sources.json and the backend normalises all of them into `MarketItem` before
+// the UI sees them. Fetching is backend-side (a user-supplied URL owes us no CORS
+// header, and the results are disk-cached so the dialog opens offline).
+// ---------------------------------------------------------------------------
+
+/** The three market dialogs are one widget with this field changed. */
+export type ExtensionKind = "plugin" | "skill" | "mcp";
+
+/** One index to consult. `adapter` names the payload shape, which is what lets a
+ *  third-party feed join without the dialog knowing anything about it. */
+export interface SourceDef {
+  id: string;
+  label: string;
+  /** "http" (fetch `url`) | "dir" (read *.json under `url`; blank ⇒ the default
+   *  `~/.agentlauncher/sources`). */
+  kind: string;
+  url: string;
+  /** "agentlauncher" (our canonical `{items:[...]}`) | "dsh-market" |
+   *  "mcp-registry" | "npm". */
+  adapter: string;
+  /** which kinds this source can answer for; others skip it entirely. */
+  kinds: string[];
+  enabled: boolean;
+  /** shipped with the launcher: disable-able, not delete-able. */
+  builtin: boolean;
+}
+
+/** ~/.agentlauncher/sources.json */
+export interface SourcesDoc {
+  format_version: number;
+  sources: SourceDef[];
+}
+
+/** How an item is actually installed. `method` is a string, not a union, so an
+ *  unknown method from a newer source degrades to "manual" instead of breaking
+ *  the payload: "pnpm-profile" | "git-clone" | "mcp-config" | "manual". */
+export interface InstallSpec {
+  method: string;
+  /** npm package, for "pnpm-profile". */
+  package: string;
+  /** git remote, for "git-clone". */
+  repo: string;
+  /** a command to display (never auto-run) for "manual" items. */
+  command: string;
+  /** env var *names* the item needs configured — never values. */
+  env: string[];
+  /** prefilled server definition for "mcp-config". */
+  mcp?: McpServerEntry | null;
+}
+
+export interface MarketVersion {
+  version: string;
+  published_at: string;
+  install: InstallSpec;
+}
+
+/** One market entry, whatever source it came from. Thin sources legitimately
+ *  leave most fields empty — the UI must render a row with name alone. */
+export interface MarketItem {
+  /** `"<source id>:<native id>"`, unique across sources. */
+  id: string;
+  source: string;
+  kind: string;
+  name: string;
+  author: string;
+  description: string;
+  /** detail-pane Markdown; often empty in a list payload, filled by `marketReadme`. */
+  readme: string;
+  /** lucide icon name for the row avatar. */
+  icon: string;
+  homepage: string;
+  repo: string;
+  tags: string[];
+  license: string;
+  downloads: number;
+  /** RFC3339, or "" when the source does not say. */
+  updated_at: string;
+  /** newest first; empty ⇒ nothing installable, show it read-only. */
+  versions: MarketVersion[];
+}
+
+/** Per-source outcome, returned with the results so a partial failure is visible
+ *  rather than silently shrinking the list. */
+export interface SourceStatus {
+  id: string;
+  ok: boolean;
+  item_count: number;
+  fetched_at: string;
+  stale: boolean;
+  error: string;
+}
+
+export interface MarketQuery {
+  kind: string;
+  query: string;
+  /** empty ⇒ every enabled source serving `kind`. */
+  sources: string[];
+  tags: string[];
+  /** "relevance" | "downloads" | "updated" | "name". */
+  sort: string;
+  offset: number;
+  /** 0 ⇒ the backend's own page size. */
+  limit: number;
+}
+
+export interface MarketPage {
+  items: MarketItem[];
+  /** total matches across sources, for paging (not `items.length`). */
+  total: number;
+  stale: boolean;
+  statuses: SourceStatus[];
+}
+

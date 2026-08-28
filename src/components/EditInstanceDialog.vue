@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
-import { Save, SlidersHorizontal, BrainCircuit, ListChecks, Wrench } from "lucide-vue-next";
+import { Save, SlidersHorizontal, BrainCircuit, ListChecks, Wrench, Puzzle, GraduationCap, Plug } from "lucide-vue-next";
 import Dialog from "@/components/ui/Dialog.vue";
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
@@ -9,10 +9,21 @@ import Label from "@/components/ui/Label.vue";
 import Select, { type SelectOption } from "@/components/ui/Select.vue";
 import GroupBox from "@/components/ui/GroupBox.vue";
 import AppIcon from "@/components/ui/AppIcon.vue";
+import PluginsSection from "@/components/edit/PluginsSection.vue";
+import SkillsSection from "@/components/edit/SkillsSection.vue";
+import McpSection from "@/components/edit/McpSection.vue";
+import MarketDialog from "@/components/market/MarketDialog.vue";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { config } from "@/lib/launcherConfig";
-import type { DshProfile, EngineInfo, Instance, NewInstance } from "@/types";
+import type {
+  DshProfile,
+  EngineInfo,
+  ExtensionKind,
+  Instance,
+  InstanceExtensions,
+  NewInstance,
+} from "@/types";
 
 const { t } = useI18n();
 
@@ -20,7 +31,7 @@ const props = defineProps<{ instance: Instance | null }>();
 const open = defineModel<boolean>("open", { default: false });
 const emit = defineEmits<{ saved: [instance: Instance] }>();
 
-type Section = "general" | "model" | "runtime" | "task";
+type Section = "general" | "model" | "runtime" | "extensions" | "skills" | "mcp" | "task";
 const section = ref<Section>("general");
 
 // Known engines, used as a fallback when live detection fails so the picker is
@@ -181,8 +192,57 @@ const navItems = [
   { key: "general" as const, icon: SlidersHorizontal, label: () => t("edit.nav.general") },
   { key: "model" as const, icon: BrainCircuit, label: () => t("edit.nav.model") },
   { key: "runtime" as const, icon: Wrench, label: () => t("edit.nav.runtime") },
+  { key: "extensions" as const, icon: Puzzle, label: () => t("edit.nav.extensions") },
+  { key: "skills" as const, icon: GraduationCap, label: () => t("edit.nav.skills") },
+  { key: "mcp" as const, icon: Plug, label: () => t("edit.nav.mcp") },
   { key: "task" as const, icon: ListChecks, label: () => t("edit.nav.task") },
 ];
+
+// ---- extensions (plugins / skills / MCP) ---------------------------------
+// One read for all three sections: they are three views of one instance's
+// extension state, and three independent fetches would let them disagree.
+// An unsaved instance has no directory yet, hence the empty id + `ext.saveFirst`.
+const instanceId = computed(() => props.instance?.id ?? "");
+const extensions = ref<InstanceExtensions | null>(null);
+const extLoading = ref(false);
+const marketOpen = ref(false);
+const marketKind = ref<ExtensionKind>("plugin");
+
+async function loadExtensions(): Promise<void> {
+  if (!instanceId.value) {
+    extensions.value = null;
+    return;
+  }
+  extLoading.value = true;
+  try {
+    extensions.value = await api.readInstanceExtensions(instanceId.value);
+  } catch (e) {
+    extensions.value = null;
+    console.error("read instance extensions failed", e);
+  } finally {
+    extLoading.value = false;
+  }
+}
+watch(
+  () => [open.value, instanceId.value] as const,
+  ([isOpen]) => {
+    if (isOpen) void loadExtensions();
+  },
+  { immediate: true }
+);
+// A profile switch changes which plugin set is in scope, so re-read on the spot
+// rather than showing the previous profile's list under the new name.
+watch(
+  () => form.profile,
+  () => {
+    if (open.value) void loadExtensions();
+  }
+);
+
+function browseMarket(kind: ExtensionKind): void {
+  marketKind.value = kind;
+  marketOpen.value = true;
+}
 
 // The dsh `profile` concept only applies to the dsh engine; other engines hide it.
 const isDsh = computed(() => form.engine === "dsh");
@@ -406,6 +466,44 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
           </div>
         </GroupBox>
 
+        <!-- Extensions / Skills / MCP — the three per-instance extension views.
+             They need a directory on disk, which an unsaved instance has not got
+             yet, so they say so rather than rendering an editor that cannot save. -->
+        <template v-if="section === 'extensions' || section === 'skills' || section === 'mcp'">
+          <div
+            v-if="!instanceId"
+            class="rounded border border-border bg-muted/40 px-3 py-2 text-[13px] text-muted-foreground"
+          >
+            {{ t("ext.saveFirst") }}
+          </div>
+          <template v-else>
+            <PluginsSection
+              v-if="section === 'extensions'"
+              :instance-id="instanceId"
+              :extensions="extensions"
+              :loading="extLoading"
+              @changed="loadExtensions"
+              @browse="browseMarket"
+            />
+            <SkillsSection
+              v-else-if="section === 'skills'"
+              :instance-id="instanceId"
+              :extensions="extensions"
+              :loading="extLoading"
+              @changed="loadExtensions"
+              @browse="browseMarket"
+            />
+            <McpSection
+              v-else
+              :instance-id="instanceId"
+              :extensions="extensions"
+              :loading="extLoading"
+              @changed="loadExtensions"
+              @browse="browseMarket"
+            />
+          </template>
+        </template>
+
         <!-- Task -->
         <GroupBox v-if="section === 'task'" :title="t('edit.nav.task')">
           <div class="grid gap-1.5">
@@ -418,6 +516,16 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
         </GroupBox>
       </div>
     </div>
+
+    <!-- The browse-and-install surface, opened from any of the three sections.
+         It reports back with `installed` so the sections re-read from disk
+         instead of guessing what the install did. -->
+    <MarketDialog
+      v-model:open="marketOpen"
+      :kind="marketKind"
+      :instance-id="instanceId"
+      @installed="loadExtensions"
+    />
 
     <template #footer>
       <Button variant="ghost" @click="open = false">{{ t("edit.cancel") }}</Button>

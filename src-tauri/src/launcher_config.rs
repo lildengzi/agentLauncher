@@ -149,7 +149,7 @@ fn inst_groups_path() -> Result<PathBuf, String> {
 
 /// Parse a JSON doc, falling back to `T::default()` when the file is missing or
 /// malformed (never bricks the launcher on a bad file).
-fn read_or_default<T: Default + serde::de::DeserializeOwned>(path: &Path) -> T {
+pub(crate) fn read_or_default<T: Default + serde::de::DeserializeOwned>(path: &Path) -> T {
     match fs::read_to_string(path) {
         Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
             eprintln!("launcher: ignoring malformed {}: {e}", path.display());
@@ -161,7 +161,7 @@ fn read_or_default<T: Default + serde::de::DeserializeOwned>(path: &Path) -> T {
 
 /// Write `value` as pretty JSON, atomically where the platform allows (temp file
 /// + rename), falling back to a direct overwrite.
-fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
+pub(crate) fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }

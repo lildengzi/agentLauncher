@@ -4,12 +4,13 @@ import type { Instance, RunStatus } from "@/types";
 import { api, onRuntimeStatus } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { config } from "@/lib/launcherConfig";
+import { instGroups } from "@/lib/instGroups";
 import TopBar from "@/components/TopBar.vue";
 import InstanceGrid from "@/components/InstanceGrid.vue";
 import RightPanel from "@/components/RightPanel.vue";
 import StatusBar from "@/components/StatusBar.vue";
 import EditInstanceDialog from "@/components/EditInstanceDialog.vue";
-import HubDialog from "@/components/HubDialog.vue";
+import ChangeGroupDialog from "@/components/ChangeGroupDialog.vue";
 import ConsoleDialog from "@/components/ConsoleDialog.vue";
 import SettingsDialog from "@/components/SettingsDialog.vue";
 
@@ -23,14 +24,14 @@ const statuses = ref<Record<string, RunStatus>>({});
 const urls = ref<Record<string, string>>({});
 const editOpen = ref(false);
 const editingInstance = ref<Instance | null>(null);
-const hubOpen = ref(false);
+const groupOpen = ref(false);
 const consoleOpen = ref(false);
 const settingsOpen = ref(false);
 
 let unlistenStatus: (() => void) | null = null;
 
 const dialogOpen = computed(
-  () => editOpen.value || hubOpen.value || consoleOpen.value || settingsOpen.value
+  () => editOpen.value || groupOpen.value || consoleOpen.value || settingsOpen.value
 );
 
 const selectedInstance = computed(
@@ -47,6 +48,15 @@ const selectedStatus = computed<RunStatus>(() =>
 const selectedUrl = computed<string | null>(() =>
   selectedId.value ? urls.value[selectedId.value] ?? null : null
 );
+// Group names already in use, for the 改变分组 picker. Both sources matter: the
+// instances themselves are the truth, and the overlay remembers a group whose last
+// instance moved out, which is exactly the name a user is likely to move back to.
+const groupNames = computed(() => {
+  const seen = new Set<string>();
+  for (const g of instGroups.order) if (g) seen.add(g);
+  for (const i of instances.value) if (i.group) seen.add(i.group);
+  return [...seen].sort((a, b) => a.localeCompare(b));
+});
 const statusLabelMap: Record<RunStatus, string> = {
   idle: "status.idle",
   starting: "status.starting",
@@ -105,6 +115,9 @@ function openEdit() {
     editingInstance.value = selectedInstance.value;
     editOpen.value = true;
   }
+}
+function openChangeGroup() {
+  if (selectedInstance.value) groupOpen.value = true;
 }
 async function onSaved(inst: Instance) {
   // Remember the group for prefilling the next New Instance dialog.
@@ -198,7 +211,7 @@ function onKey(e: KeyboardEvent) {
     case "k":
       return hit(() => void stop());
     case "c":
-      return hit(() => (hubOpen.value = true));
+      return hit(openChangeGroup);
     case "f":
       return hit(() => void openFolder());
     case "x":
@@ -233,7 +246,7 @@ function onKey(e: KeyboardEvent) {
         @start="start()"
         @stop="stop"
         @edit="openEdit"
-        @manage-mcp="hubOpen = true"
+        @change-group="openChangeGroup"
         @open-folder="openFolder"
         @duplicate="duplicate"
         @remove="remove"
@@ -260,7 +273,12 @@ function onKey(e: KeyboardEvent) {
       :instance="editingInstance"
       @saved="onSaved"
     />
-    <HubDialog v-model:open="hubOpen" :profile="selectedInstance?.profile" />
+    <ChangeGroupDialog
+      v-model:open="groupOpen"
+      :instance="selectedInstance"
+      :groups="groupNames"
+      @saved="onSaved"
+    />
     <SettingsDialog v-model:open="settingsOpen" />
   </div>
 </template>

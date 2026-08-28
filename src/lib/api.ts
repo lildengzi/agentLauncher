@@ -5,11 +5,17 @@ import type {
   EngineInfo,
   InstGroups,
   Instance,
+  InstallSpec,
+  InstanceExtensions,
   LauncherConfig,
-  McpPlugin,
+  MarketPage,
+  MarketQuery,
+  McpServerEntry,
   NewInstance,
   RuntimeLogEvent,
   RuntimeStatusEvent,
+  SourceStatus,
+  SourcesDoc,
 } from "@/types";
 
 // ---- Tauri commands -------------------------------------------------------
@@ -33,10 +39,41 @@ export const api = {
   /** Open a URL (e.g. a web instance's served UI) in the default browser. */
   openUrl: (url: string) => invoke<void>("open_url", { url }),
 
-  listMcpCatalog: () => invoke<McpPlugin[]>("list_mcp_catalog"),
-
   /** Live-probe which known agent engines (CLIs) are installed on the host. */
   detectEngines: () => invoke<EngineInfo[]>("detect_engines"),
+
+  // ---- per-instance extensions (edit dialog's three sections) -------------
+  /** Plugins + skills + MCP servers for one instance, in one round trip. */
+  readInstanceExtensions: (id: string) =>
+    invoke<InstanceExtensions>("read_instance_extensions", { id }),
+  /** Replace the whole `mcpServers` map of an instance's mcp.json. */
+  setInstanceMcp: (id: string, servers: McpServerEntry[]) =>
+    invoke<void>("set_instance_mcp", { id, servers }),
+  /** Delete one skill directory under `instances/<id>/skills/`. */
+  removeInstanceSkill: (id: string, name: string) =>
+    invoke<void>("remove_instance_skill", { id, name }),
+  /** Reveal one of an instance's own subdirectories ("skills"|"workspace"|"logs"). */
+  openInstanceSubdir: (id: string, sub: string) =>
+    invoke<void>("open_instance_subdir", { id, sub }),
+
+  // ---- decentralized market ----------------------------------------------
+  /** Query every enabled source that serves `query.kind`, merged and sorted. */
+  marketFetch: (query: MarketQuery) => invoke<MarketPage>("market_fetch", { query }),
+  /** Force a refetch past the cache; omit the id to refresh every source. */
+  marketRefresh: (sourceId?: string) =>
+    invoke<SourceStatus[]>("market_refresh", { sourceId: sourceId ?? null }),
+  /** Lazily fetch one item's detail Markdown for the right-hand pane. */
+  marketReadme: (itemId: string) => invoke<string>("market_readme", { itemId }),
+  /** Run an item's install for real; returns a short note (path/package/server). */
+  marketInstall: (instanceId: string, name: string, spec: InstallSpec) =>
+    invoke<string>("market_install", { instanceId, name, spec }),
+  /** Undo `marketInstall` for the same item. */
+  marketUninstall: (instanceId: string, name: string, spec: InstallSpec) =>
+    invoke<string>("market_uninstall", { instanceId, name, spec }),
+  /** The source list; built-ins are re-seeded on read. */
+  getMarketSources: () => invoke<SourcesDoc>("get_market_sources"),
+  /** Persist the source list (built-ins are restored, `builtin` is not caller-set). */
+  setMarketSources: (doc: SourcesDoc) => invoke<void>("set_market_sources", { doc }),
 
   // ---- real dsh config wiring --------------------------------------------
   /** Names (not values) of credentials stored in ~/.dsh/.credentials.yaml. */

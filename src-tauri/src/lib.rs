@@ -1,14 +1,15 @@
 mod engines;
 mod executor;
+mod instance_ext;
 mod instance_manager;
 mod launcher_config;
+mod market;
 mod runtime;
 #[cfg(test)]
 mod test_support;
 
 use executor::RunnerState;
 use instance_manager::{Instance, NewInstance};
-use serde_json::json;
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -77,77 +78,6 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Curated plugin catalog for the Hub. dsh has no remote plugin market, so
-/// discovery is a curated list; entries carrying a real `package` (npm name) can
-/// be installed/removed for real via `dsh plugin add|remove` (see
-/// `runtime::dsh_home`).
-/// The frontend cross-references `list_installed_plugins` for live installed state.
-#[tauri::command]
-fn list_mcp_catalog() -> serde_json::Value {
-    json!([
-        {
-            "id": "mcp-client",
-            "name": "MCP Client",
-            "author": "@deepseek-ai",
-            "package": "@deepseek-ai/dsh-mcp-client",
-            "description": "接入任意 Model Context Protocol 服务器（工具 / 资源 / 提示词）",
-            "icon": "plug",
-            "category": "modrinth",
-            "version": "latest",
-            "installed": false,
-            "links": [{ "label": "npm", "url": "https://www.npmjs.com/package/@deepseek-ai/dsh-mcp-client" }]
-        },
-        {
-            "id": "web-search-deepseek",
-            "name": "Web Search (DeepSeek)",
-            "author": "@deepseek-ai",
-            "package": "@deepseek-ai/dsh-web-search-deepseek",
-            "description": "DeepSeek 官方联网搜索工具，供 Agent 检索实时信息",
-            "icon": "search",
-            "category": "modrinth",
-            "version": "latest",
-            "installed": false,
-            "links": [{ "label": "npm", "url": "https://www.npmjs.com/package/@deepseek-ai/dsh-web-search-deepseek" }]
-        },
-        {
-            "id": "tool-web",
-            "name": "Web Fetch Tool",
-            "author": "@deepseek-ai",
-            "package": "@deepseek-ai/dsh-tool-web",
-            "description": "抓取网页并转为可读文本，支持 Agent 直接读取 URL 内容",
-            "icon": "globe",
-            "category": "modrinth",
-            "version": "latest",
-            "installed": false,
-            "links": [{ "label": "npm", "url": "https://www.npmjs.com/package/@deepseek-ai/dsh-tool-web" }]
-        },
-        {
-            "id": "skill-filesystem",
-            "name": "Filesystem Skills",
-            "author": "@deepseek-ai",
-            "package": "@deepseek-ai/dsh-skill-filesystem",
-            "description": "从磁盘目录加载 Skill 定义，扩展 Agent 的技能库",
-            "icon": "folder-tree",
-            "category": "github",
-            "version": "latest",
-            "installed": false,
-            "links": [{ "label": "npm", "url": "https://www.npmjs.com/package/@deepseek-ai/dsh-skill-filesystem" }]
-        },
-        {
-            "id": "schedule",
-            "name": "Schedule",
-            "author": "@deepseek-ai",
-            "package": "@deepseek-ai/dsh-schedule",
-            "description": "为 Agent 提供定时 / 延时任务调度能力",
-            "icon": "alarm-clock",
-            "category": "github",
-            "version": "latest",
-            "installed": false,
-            "links": [{ "label": "npm", "url": "https://www.npmjs.com/package/@deepseek-ai/dsh-schedule" }]
-        }
-    ])
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -163,8 +93,18 @@ pub fn run() {
             stop_instance,
             open_instance_folder,
             open_url,
-            list_mcp_catalog,
             engines::detect_engines,
+            instance_ext::read_instance_extensions,
+            instance_ext::set_instance_mcp,
+            instance_ext::remove_instance_skill,
+            instance_ext::open_instance_subdir,
+            market::market_fetch,
+            market::market_refresh,
+            market::market_readme,
+            market::install::market_install,
+            market::install::market_uninstall,
+            market::sources::get_market_sources,
+            market::sources::set_market_sources,
             runtime::dsh_home::list_credential_keys,
             runtime::dsh_home::set_credential,
             runtime::dsh_home::list_dsh_profiles,

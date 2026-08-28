@@ -17,7 +17,7 @@ const emit = defineEmits<{
   start: [];
   stop: [];
   edit: [];
-  manageMcp: [];
+  changeGroup: [];
   openFolder: [];
   duplicate: [];
   remove: [];
@@ -75,7 +75,12 @@ const runActive = computed(
       <!-- management -->
       <div class="border-t border-border py-1">
         <ActionButton icon="pencil" :label="t('right.edit')" accel="E" @click="emit('edit')" />
-        <ActionButton icon="puzzle" :label="t('right.mcp')" accel="C" @click="emit('manageMcp')" />
+        <ActionButton
+          icon="folder-tree"
+          :label="t('right.changeGroup')"
+          accel="C"
+          @click="emit('changeGroup')"
+        />
         <ActionButton
           icon="folder-open"
           :label="t('right.folder')"

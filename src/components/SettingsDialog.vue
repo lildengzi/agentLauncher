@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { Palette, SlidersHorizontal, KeyRound, Info, Check } from "lucide-vue-next";
+import { Palette, SlidersHorizontal, KeyRound, Database, Info, Check } from "lucide-vue-next";
 import Dialog from "@/components/ui/Dialog.vue";
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import GroupBox from "@/components/ui/GroupBox.vue";
 import Select, { type SelectOption } from "@/components/ui/Select.vue";
+import SourcesSection from "@/components/settings/SourcesSection.vue";
 import { useTheme } from "@/lib/theme";
 import { useI18n, type Locale } from "@/lib/i18n";
 import { modelConfig, saveModelConfig, PROVIDERS } from "@/lib/settings";
@@ -15,13 +16,14 @@ const open = defineModel<boolean>("open", { default: false });
 const { t, locale, setLocale } = useI18n();
 const { current, themes, setTheme } = useTheme();
 
-type Section = "appearance" | "general" | "model" | "about";
+type Section = "appearance" | "general" | "model" | "sources" | "about";
 const section = ref<Section>("appearance");
 
 const nav: { id: Section; icon: any; key: string }[] = [
   { id: "appearance", icon: Palette, key: "settings.nav.appearance" },
   { id: "general", icon: SlidersHorizontal, key: "settings.nav.general" },
   { id: "model", icon: KeyRound, key: "settings.nav.model" },
+  { id: "sources", icon: Database, key: "settings.nav.sources" },
   { id: "about", icon: Info, key: "settings.nav.about" },
 ];
 
@@ -86,7 +88,6 @@ function pickProvider(id: string): void {
 }
 </script>
 
-<!-- TEMPLATE_PLACEHOLDER -->
 <template>
   <Dialog v-model:open="open" width="max-w-3xl" class="h-[78vh]" :title="t('settings.title')">
     <div class="flex h-full min-h-0">
@@ -193,6 +194,12 @@ function pickProvider(id: string): void {
               <span v-if="saveError" class="text-[13px] text-destructive">{{ saveError }}</span>
             </div>
           </GroupBox>
+        </template>
+
+        <!-- MARKET SOURCES — the decentralized feed list; the section owns its
+             own load/save cycle so this dialog holds no market state. -->
+        <template v-else-if="section === 'sources'">
+          <SourcesSection />
         </template>
 
         <!-- ABOUT -->
