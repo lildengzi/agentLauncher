@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { Save, SlidersHorizontal, BrainCircuit, ListChecks, Wrench, Puzzle, GraduationCap, Plug } from "lucide-vue-next";
 import Dialog from "@/components/ui/Dialog.vue";
+import DialogPanel from "@/components/ui/DialogPanel.vue";
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import Textarea from "@/components/ui/Textarea.vue";
@@ -27,7 +28,14 @@ import type {
 
 const { t } = useI18n();
 
-const props = defineProps<{ instance: Instance | null }>();
+const props = defineProps<{
+  instance: Instance | null;
+  /** Render as the whole content of its own OS window instead of as a modal.
+   *  Only the container changes: the panel fills the window, the title lives in
+   *  the OS titlebar (so no header row and no redundant X), and `open = false`
+   *  means "this window is done" rather than "hide the overlay". */
+  inline?: boolean;
+}>();
 const open = defineModel<boolean>("open", { default: false });
 const emit = defineEmits<{ saved: [instance: Instance] }>();
 
@@ -73,7 +81,10 @@ watch(
       /* keep fallback */
     }
   },
-  { immediate: false }
+  // Immediate because in a standalone editor window `open` starts true and never
+  // changes, so a change-only watcher would never probe at all. The `!v` guard
+  // above makes the extra call a no-op for the modal case.
+  { immediate: true }
 );
 
 interface FormState {
@@ -300,11 +311,18 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
 </script>
 
 <template>
-  <Dialog
+  <component
+    :is="props.inline ? DialogPanel : Dialog"
     v-model:open="open"
-    width="max-w-2xl"
-    class="h-[72vh]"
-    :title="props.instance ? t('edit.title.edit') : t('edit.title.new')"
+    :width="props.inline ? undefined : 'max-w-2xl'"
+    :class="props.inline ? 'h-screen w-screen' : 'h-[72vh]'"
+    :title="
+      props.inline
+        ? undefined
+        : props.instance
+          ? t('edit.title.edit')
+          : t('edit.title.new')
+    "
   >
     <div class="flex h-full min-h-0">
       <!-- Left nav -->
@@ -542,5 +560,5 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
         {{ t("edit.save") }}
       </Button>
     </template>
-  </Dialog>
+  </component>
 </template>

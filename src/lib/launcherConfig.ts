@@ -71,9 +71,19 @@ function migrateFromLocalStorage(): void {
   }
 }
 
-/** Hydrate `config` from disk, run the one-time migration, and start persisting
- *  subsequent changes. Call once at startup before relying on config values. */
-export async function initLauncherConfig(): Promise<void> {
+/** Hydrate `config` from disk and, unless told otherwise, start persisting
+ *  subsequent changes. Call once at startup before relying on config values.
+ *
+ *  `persist: false` is for secondary windows (the per-instance editor). Every
+ *  webview is its own JS context with its own reactive copy of this object, so
+ *  arming the autosave in more than one window would have each of them
+ *  debounce-writing the *whole* config.json — last writer wins, silently
+ *  reverting whatever the other window changed. The main window owns persistence;
+ *  the others read. The localStorage migration is skipped for the same reason: it
+ *  writes too. */
+export async function initLauncherConfig(
+  opts: { persist?: boolean } = {}
+): Promise<void> {
   try {
     const remote = await api.getLauncherConfig();
     config.format_version = remote.format_version ?? 1;
@@ -83,6 +93,7 @@ export async function initLauncherConfig(): Promise<void> {
   } catch (e) {
     console.error("load launcher config failed; using defaults", e);
   }
+  if (opts.persist === false) return;
   migrateFromLocalStorage();
   hydrated = true;
   watch(config, scheduleSave, { deep: true });

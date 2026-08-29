@@ -23,7 +23,6 @@ const selectedId = ref<string | null>(null);
 const statuses = ref<Record<string, RunStatus>>({});
 const urls = ref<Record<string, string>>({});
 const editOpen = ref(false);
-const editingInstance = ref<Instance | null>(null);
 const groupOpen = ref(false);
 const consoleOpen = ref(false);
 const settingsOpen = ref(false);
@@ -31,6 +30,8 @@ const settingsOpen = ref(false);
 let unlistenStatus: (() => void) | null = null;
 
 const dialogOpen = computed(
+  // Only real modals belong here. The instance editor is its own window now, and a
+  // window must not disable this window's mnemonics.
   () => editOpen.value || groupOpen.value || consoleOpen.value || settingsOpen.value
 );
 
@@ -90,6 +91,10 @@ watch(selectedId, (id) => {
 onMounted(async () => {
   // Bind the mnemonics first so a slow backend can never strand the keyboard.
   window.addEventListener("keydown", onKey);
+  // An editor window writes instance.json behind this window's back, so re-read the
+  // list whenever focus comes back rather than plumbing an event for it. It also
+  // picks up an instance.json edited outside the app, which an event would not.
+  window.addEventListener("focus", onWindowFocus);
   await loadInstances();
   unlistenStatus = await onRuntimeStatus((e) => {
     statuses.value = { ...statuses.value, [e.instanceId]: e.status };
@@ -104,16 +109,21 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   unlistenStatus?.();
   window.removeEventListener("keydown", onKey);
+  window.removeEventListener("focus", onWindowFocus);
 });
 
+function onWindowFocus() {
+  void loadInstances();
+}
+
 function openCreate() {
-  editingInstance.value = null;
+  // New Instance stays a modal: a window keyed by the instance id cannot exist
+  // before the id does. Editing an existing one opens its own window instead.
   editOpen.value = true;
 }
 function openEdit() {
-  if (selectedInstance.value) {
-    editingInstance.value = selectedInstance.value;
-    editOpen.value = true;
+  if (selectedId.value) {
+    api.openEditWindow(selectedId.value).catch((e) => console.error("open editor failed", e));
   }
 }
 function openChangeGroup() {
@@ -268,11 +278,7 @@ function onKey(e: KeyboardEvent) {
       @stop="stop"
       @open-web="openWeb"
     />
-    <EditInstanceDialog
-      v-model:open="editOpen"
-      :instance="editingInstance"
-      @saved="onSaved"
-    />
+    <EditInstanceDialog v-model:open="editOpen" :instance="null" @saved="onSaved" />
     <ChangeGroupDialog
       v-model:open="groupOpen"
       :instance="selectedInstance"

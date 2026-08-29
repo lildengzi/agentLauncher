@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { cn } from "@/lib/utils";
-import { X } from "lucide-vue-next";
+import DialogPanel from "@/components/ui/DialogPanel.vue";
 
+// The modal container: a backdrop that closes on an outside click, wrapping the
+// shared DialogPanel chrome. Teleported to <body> so a dialog opened from inside a
+// scroll container or another dialog is not clipped by it.
 const props = withDefaults(
   defineProps<{
     /** dialog panel width class, e.g. "max-w-lg", "max-w-4xl". */
@@ -32,41 +35,24 @@ function close() {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-6"
         @click.self="close"
       >
-        <div
+        <DialogPanel
+          v-model:open="open"
+          :title="title"
           :class="
             cn(
-              'relative w-full max-h-[92vh] overflow-hidden flex flex-col rounded-sm border border-border-strong bg-background shadow-[0_16px_48px_-12px_rgba(0,0,0,0.85)]',
+              'w-full max-h-[92vh] rounded-sm border border-border-strong shadow-[0_16px_48px_-12px_rgba(0,0,0,0.85)]',
               props.width,
               props.class
             )
           "
         >
-          <div
-            v-if="title || $slots.header"
-            class="flex items-center justify-between border-b border-border bg-toolbar px-3 py-2"
-          >
-            <slot name="header">
-              <h2 class="text-[14px] font-semibold text-foreground">{{ title }}</h2>
-            </slot>
-            <button
-              class="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              @click="close"
-            >
-              <X class="h-4 w-4" />
-            </button>
-          </div>
-
-          <div class="flex-1 min-h-0 overflow-y-auto">
-            <slot />
-          </div>
-
-          <div
-            v-if="$slots.footer"
-            class="flex items-center gap-2 border-t border-border bg-toolbar px-3 py-2"
-          >
-            <slot name="footer" />
-          </div>
-        </div>
+          <!-- Forwarded conditionally: an unconditional <template #footer> would
+               make the panel's own `$slots.footer` check always true and draw an
+               empty footer bar under every dialog that has none. -->
+          <template v-if="$slots.header" #header><slot name="header" /></template>
+          <slot />
+          <template v-if="$slots.footer" #footer><slot name="footer" /></template>
+        </DialogPanel>
       </div>
     </Transition>
   </Teleport>

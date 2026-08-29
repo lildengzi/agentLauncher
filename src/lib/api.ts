@@ -39,6 +39,14 @@ export const api = {
   /** Open a URL (e.g. a web instance's served UI) in the default browser. */
   openUrl: (url: string) => invoke<void>("open_url", { url }),
 
+  /**
+   * Open — or focus, if it is already up — the standalone editor window for one
+   * instance. One window per instance; the backend keys them by the label
+   * `edit-<id>` and builds them itself, so the frontend needs no permission to
+   * create webviews.
+   */
+  openEditWindow: (id: string) => invoke<void>("open_edit_window", { id }),
+
   /** Live-probe which known agent engines (CLIs) are installed on the host. */
   detectEngines: () => invoke<EngineInfo[]>("detect_engines"),
 
