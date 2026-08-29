@@ -1,13 +1,14 @@
-// Global launcher model/API defaults. The non-secret fields mirror
-// config.defaults (persisted to ~/.agentlauncher/config.json via launcherConfig);
-// `apiKey` is transient and never persisted here — it goes to dsh's
-// ~/.dsh/.credentials.yaml (via api.setCredential).
+// Global launcher model/API defaults — the prefill a new instance starts from.
+// Mirrors config.defaults (persisted to ~/.agentlauncher/config.json via
+// launcherConfig) and holds nothing secret: it never had a place to put a key, and
+// now it does not even carry a draft. Values go to `~/.agentlauncher/providers.json`
+// (via api.setProviderKey) or, for dsh, to `~/.dsh/.credentials.yaml` (via
+// api.setCredential) — in both cases straight from the field to the backend.
 import { reactive, watch } from "vue";
 import { config } from "@/lib/launcherConfig";
 
 export interface ModelConfig {
   provider: string;
-  apiKey: string;
   defaultModel: string;
 }
 
@@ -17,7 +18,6 @@ export interface ModelConfig {
 function defaults(): ModelConfig {
   return {
     provider: "",
-    apiKey: "",
     defaultModel: "",
   };
 }
@@ -41,17 +41,10 @@ watch(
   }
 );
 
-/** Known providers for the settings dropdown. `apiKeyEnv` is the credential
- *  reference dsh resolves (written to ~/.dsh/.credentials.yaml). Base URLs are
- *  not listed: they never reached an engine from here — every engine reads its
- *  own base URL from the instance `.env`. */
-export const PROVIDERS: {
-  id: string;
-  label: string;
-  apiKeyEnv: string;
-  models: string[];
-}[] = [
-  { id: "deepseek", label: "DeepSeek", apiKeyEnv: "DEEPSEEK_API_KEY", models: ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-reasoner", "deepseek-chat"] },
-  { id: "openai", label: "OpenAI", apiKeyEnv: "OPENAI_API_KEY", models: ["gpt-4o", "gpt-4o-mini", "o3-mini"] },
-  { id: "openai-compatible", label: "OpenAI 兼容 / 自定义", apiKeyEnv: "OPENAI_API_KEY", models: [] },
-];
+/** The provider list is no longer hardcoded here.
+ *
+ *  It lives in `~/.agentlauncher/providers.json` and is read with
+ *  `api.getProviders()` — because it is now user-extensible, and because each row
+ *  carries API keys, which must never sit in frontend module state. `ProviderView`
+ *  in `@/types` is the shape; `providers::builtins()` in the backend seeds the four
+ *  rows this constant used to hold. */

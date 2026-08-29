@@ -180,6 +180,9 @@ async function duplicate() {
     profile: s.profile,
     provider: s.provider,
     model: s.model,
+    // A duplicate launches like its original, key binding included — the copy is
+    // only useful if it can actually start.
+    api_key_ref: s.api_key_ref,
     runtime: { ...s.runtime },
     default_task: s.default_task,
   });

@@ -399,6 +399,7 @@ fn create_instance_per_engine_then_build_from_disk() {
             profile: "headless".into(),
             provider: provider.into(),
             model: model.into(),
+            api_key_ref: String::new(),
             default_task: String::new(),
             runtime: RuntimeConfig {
                 engine: spec.id.into(),
@@ -422,6 +423,7 @@ fn create_instance_per_engine_then_build_from_disk() {
             "\"env_policy\"",
             "\"provider\"",
             "\"schema_version\"",
+            "\"api_key_ref\"",
         ] {
             assert!(
                 raw.contains(field),
@@ -430,13 +432,21 @@ fn create_instance_per_engine_then_build_from_disk() {
             );
         }
         let lower = raw.to_lowercase();
-        for leak in ["api_key", "apikey", "credential", "sk-"] {
+        for leak in ["apikey", "credential", "sk-"] {
             assert!(
                 !lower.contains(leak),
                 "{}: instance.json must stay secret-free (found {leak})",
                 spec.id
             );
         }
+        // `api_key_ref` names a key stored in `providers.json`; it is a reference, and
+        // the only `api_key`-shaped thing allowed here. Any other spelling would mean
+        // a value had crept into the contract file.
+        assert!(
+            !lower.replace("\"api_key_ref\"", "").contains("api_key"),
+            "{}: instance.json must stay secret-free (found api_key)",
+            spec.id
+        );
 
         // Reload through the same path the UI reads, then dispatch and build.
         let stored = instance_manager::get_instance(&created.id).unwrap();

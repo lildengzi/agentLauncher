@@ -40,7 +40,7 @@ fn credentials_path() -> Result<PathBuf, String> {
     Ok(root()?.join(".credentials.yaml"))
 }
 
-fn is_posix_identifier(k: &str) -> bool {
+pub(crate) fn is_posix_identifier(k: &str) -> bool {
     !k.is_empty()
         && k.chars()
             .next()

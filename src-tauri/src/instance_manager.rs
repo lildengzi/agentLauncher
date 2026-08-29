@@ -65,6 +65,13 @@ pub struct Instance {
     pub provider: String,
     #[serde(default)]
     pub model: String,
+    /// Which stored API key this instance launches with: `"<provider>"` to rotate
+    /// that provider's enabled keys, `"<provider>/<alias>"` to pin one, empty to let
+    /// the launcher fall back to matching `provider` against a provider id (and
+    /// inject nothing if that finds no match). A *reference*, never a secret — values
+    /// live only in `~/.agentlauncher/providers.json`. See `providers::dispatch`.
+    #[serde(default)]
+    pub api_key_ref: String,
     #[serde(default)]
     pub default_task: String,
     #[serde(default)]
@@ -88,6 +95,11 @@ pub struct NewInstance {
     pub provider: String,
     #[serde(default)]
     pub model: String,
+    /// Optional at creation — the New Instance dialog offers the picker only once a
+    /// provider list is loaded, and an unbound instance still launches (see
+    /// `providers::dispatch`).
+    #[serde(default)]
+    pub api_key_ref: String,
     #[serde(default)]
     pub default_task: String,
     #[serde(default)]
@@ -207,6 +219,9 @@ pub fn create_instance(payload: NewInstance) -> Result<Instance, String> {
         profile: payload.profile,
         provider: payload.provider,
         model: payload.model,
+        // Empty is the normal case: an unbound instance falls back to matching
+        // `provider` against a provider id, and injects nothing if that misses.
+        api_key_ref: payload.api_key_ref.trim().to_string(),
         default_task: payload.default_task,
         runtime: payload.runtime,
         created_at: Utc::now().to_rfc3339(),
@@ -272,6 +287,7 @@ mod tests {
             profile: "web".into(),
             provider: String::new(),
             model: String::new(),
+            api_key_ref: String::new(),
             default_task: String::new(),
             runtime: RuntimeConfig::default(),
         })

@@ -4,6 +4,7 @@ mod instance_ext;
 mod instance_manager;
 mod launcher_config;
 mod market;
+mod providers;
 mod runtime;
 #[cfg(test)]
 mod test_support;
@@ -128,6 +129,8 @@ pub fn run() {
             open_edit_window,
             engines::detect_engines,
             instance_ext::read_instance_extensions,
+            instance_ext::read_instance_agents,
+            instance_ext::write_instance_agents,
             instance_ext::set_instance_mcp,
             instance_ext::remove_instance_skill,
             instance_ext::open_instance_subdir,
@@ -138,6 +141,11 @@ pub fn run() {
             market::install::market_uninstall,
             market::sources::get_market_sources,
             market::sources::set_market_sources,
+            providers::get_providers,
+            providers::set_providers,
+            providers::set_provider_key,
+            providers::detect::detect_local_llms,
+            providers::detect::fetch_provider_models,
             runtime::dsh_home::list_credential_keys,
             runtime::dsh_home::set_credential,
             runtime::dsh_home::list_dsh_profiles,

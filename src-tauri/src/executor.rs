@@ -17,6 +17,7 @@ use tokio::io::{AsyncReadExt, BufReader};
 use tokio::sync::mpsc;
 
 use crate::instance_manager;
+use crate::providers;
 use crate::runtime::{self, SpawnRequest};
 
 /// Maps a running instance id to a channel that kills its process.
@@ -195,6 +196,21 @@ pub async fn start(
         runtime::env::resolve_child_path(&inst.runtime.env_policy, &inst.runtime.custom_bin).await
     {
         cmd.env("PATH", path);
+    }
+    // The stored API key for this launch (bound alias, or the next one in this
+    // provider's rotation). This is the launcher's only chance to choose a
+    // credential — it never sees a request — so a key that cannot be resolved fails
+    // the launch here rather than surfacing as a 401 inside the agent's own output.
+    // Layered before the instance `.env` on purpose: a key written by hand there is
+    // the most specific source and still wins.
+    match providers::dispatch::env_for_instance(&inst) {
+        Ok(pairs) => {
+            cmd.envs(pairs);
+        }
+        Err(e) => {
+            emit_status(&app, &id, "error", None, Some(e.clone()), None);
+            return Err(e);
+        }
     }
     cmd.envs(parse_env(&env_path))
         .stdin(Stdio::null())

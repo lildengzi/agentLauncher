@@ -87,6 +87,27 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
+/// Replace a file whole: write a sibling temp file, then rename over the target.
+/// A crash mid-write leaves the previous file intact instead of a truncated one.
+/// The temp name is the target plus `.tmp` rather than a replaced extension, so
+/// `mcp.json` stays `mcp.json.tmp` and cannot collide with a sibling that differs
+/// only by extension. `fs::rename` is not atomic on every filesystem a home
+/// directory can live on, hence the plain-write fallback.
+fn write_atomic(path: &Path, text: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+    fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    if fs::rename(&tmp, path).is_err() {
+        fs::write(path, text).map_err(|e| e.to_string())?;
+        let _ = fs::remove_file(&tmp);
+    }
+    Ok(())
+}
+
 /// `mcp.json` as a whole. `servers` is the legacy alias the old scaffold wrote;
 /// it is read and then dropped, never written back.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -153,17 +174,8 @@ fn write_mcp(id: &str, servers: &[McpServerEntry]) -> Result<(), String> {
         servers: BTreeMap::new(),
     };
     let path = mcp_path(id)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
     let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())? + "\n";
-    let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, &text).map_err(|e| e.to_string())?;
-    if fs::rename(&tmp, &path).is_err() {
-        fs::write(&path, &text).map_err(|e| e.to_string())?;
-        let _ = fs::remove_file(&tmp);
-    }
-    Ok(())
+    write_atomic(&path, &text)
 }
 
 // ---- skills ---------------------------------------------------------------
@@ -219,6 +231,52 @@ fn read_skills(id: &str) -> Result<Vec<SkillEntry>, String> {
         .collect();
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(out)
+}
+
+// ---- AGENTS.md ------------------------------------------------------------
+// The instance's system prompt and behaviour rules (the spec's 备注 → 人设与契约
+// row). Read and written on its own rather than folded into
+// `read_instance_extensions`, for two reasons: that call shells out to dsh for a
+// plugin list this page does not want to wait on, and it is re-issued whenever
+// the engine/profile pickers change — which would throw away a half-typed draft
+// of a file those pickers have nothing to do with.
+
+/// `AGENTS.md` plus whether the file is actually there.
+///
+/// The bool is not decoration. An instance scaffolded before `create_instance`
+/// seeded the file has no `AGENTS.md` at all, and "no file yet, saving creates
+/// one" is a different answer from "the file is empty". Absence is never an
+/// error: the editor has to open for every instance.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct AgentsDoc {
+    pub text: String,
+    pub exists: bool,
+}
+
+fn agents_path(id: &str) -> Result<PathBuf, String> {
+    Ok(instance_manager::instance_dir(id)?.join("AGENTS.md"))
+}
+
+#[tauri::command]
+pub fn read_instance_agents(id: String) -> Result<AgentsDoc, String> {
+    let path = agents_path(&id)?;
+    match fs::read_to_string(&path) {
+        Ok(text) => Ok(AgentsDoc { text, exists: true }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(AgentsDoc::default()),
+        // Anything else (a permission problem, a directory in its place) is a real
+        // failure and must not be shown as an empty prompt the user might save over.
+        Err(e) => Err(format!("{}: {e}", path.display())),
+    }
+}
+
+/// Write `AGENTS.md` verbatim — no trimming, no added trailing newline. It is
+/// prose the user typed, and normalising it here would make the next read differ
+/// from what the editor still has on screen.
+#[tauri::command]
+pub fn write_instance_agents(id: String, text: String) -> Result<(), String> {
+    // Reject an unknown id before touching the disk, as set_instance_mcp does.
+    instance_manager::get_instance(&id)?;
+    write_atomic(&agents_path(&id)?, &text)
 }
 
 // ---- commands -------------------------------------------------------------
@@ -314,6 +372,7 @@ mod tests {
             profile: "headless".into(),
             provider: String::new(),
             model: String::new(),
+            api_key_ref: String::new(),
             default_task: String::new(),
             runtime: Default::default(),
         })
@@ -400,5 +459,42 @@ mod tests {
         remove_instance_skill(id.clone(), "bare".into()).unwrap();
         assert!(!skills.join("bare").exists());
         assert!(skills.join("pdf-forms").is_dir());
+    }
+
+    #[test]
+    fn agents_md_roundtrips_and_tells_absence_from_emptiness() {
+        let _g = HOME_LOCK.lock().unwrap();
+        let tree = temp_tree("ext-agents");
+        let _home = EnvGuard::set("HOME", tree.path());
+        let id = scaffold(tree.path());
+        let path = agents_path(&id).unwrap();
+
+        // create_instance seeds the file, so a fresh instance already has one.
+        let seeded = read_instance_agents(id.clone()).unwrap();
+        assert!(seeded.exists);
+        assert!(!seeded.text.is_empty());
+
+        // An instance from an older build has none: absent, not an error.
+        fs::remove_file(&path).unwrap();
+        let missing = read_instance_agents(id.clone()).unwrap();
+        assert!(!missing.exists, "a missing AGENTS.md must report exists=false");
+        assert_eq!(missing.text, "");
+
+        // Written verbatim — trailing whitespace and all, so a reload matches what
+        // the editor still shows.
+        let body = "# Persona\n\n  你是一个自包含的代码分析 Agent。  \n\n";
+        write_instance_agents(id.clone(), body.into()).unwrap();
+        let back = read_instance_agents(id.clone()).unwrap();
+        assert!(back.exists);
+        assert_eq!(back.text, body);
+
+        // An emptied file still exists, which is why `exists` is not `!text.is_empty()`.
+        write_instance_agents(id.clone(), String::new()).unwrap();
+        let emptied = read_instance_agents(id.clone()).unwrap();
+        assert!(emptied.exists);
+        assert_eq!(emptied.text, "");
+
+        // The atomic write leaves no temp file next to the target.
+        assert!(!path.with_file_name("AGENTS.md.tmp").exists());
     }
 }

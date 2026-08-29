@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
-import { Palette, SlidersHorizontal, KeyRound, Database, Info, Check } from "lucide-vue-next";
+import { ref } from "vue";
+import { Palette, SlidersHorizontal, KeyRound, Database, Info, Check, Users, Server, Wrench, Network } from "lucide-vue-next";
 import Dialog from "@/components/ui/Dialog.vue";
 import Button from "@/components/ui/Button.vue";
-import Input from "@/components/ui/Input.vue";
 import GroupBox from "@/components/ui/GroupBox.vue";
-import Select, { type SelectOption } from "@/components/ui/Select.vue";
 import SourcesSection from "@/components/settings/SourcesSection.vue";
+import ProvidersSection from "@/components/settings/ProvidersSection.vue";
 import { useTheme } from "@/lib/theme";
 import { useI18n, type Locale } from "@/lib/i18n";
-import { modelConfig, saveModelConfig, PROVIDERS } from "@/lib/settings";
-import { api } from "@/lib/api";
 
 const open = defineModel<boolean>("open", { default: false });
 const { t, locale, setLocale } = useI18n();
@@ -19,72 +16,28 @@ const { current, themes, setTheme } = useTheme();
 type Section = "appearance" | "general" | "model" | "sources" | "about";
 const section = ref<Section>("appearance");
 
-const nav: { id: Section; icon: any; key: string }[] = [
+/** One left-nav row. `id: null` marks a section that is spec'd but not built:
+ *  it is listed, disabled, and badged 「规划中」 rather than hidden, so the
+ *  sidebar shows the whole planned shape instead of implying these settings do
+ *  not exist. A planned row has no page, which is why it is not a `Section`. */
+type NavEntry = { id: Section | null; icon: any; key: string };
+
+const nav: NavEntry[] = [
   { id: "appearance", icon: Palette, key: "settings.nav.appearance" },
   { id: "general", icon: SlidersHorizontal, key: "settings.nav.general" },
   { id: "model", icon: KeyRound, key: "settings.nav.model" },
   { id: "sources", icon: Database, key: "settings.nav.sources" },
+  // Prism's Accounts / Services / Tools / Proxy pages, in its order. Still empty
+  // here; each needs a data contract of its own (see docs/spec/step2.md 设置页).
+  { id: null, icon: Users, key: "settings.nav.accounts" },
+  { id: null, icon: Server, key: "settings.nav.remote" },
+  { id: null, icon: Wrench, key: "settings.nav.tools" },
+  { id: null, icon: Network, key: "settings.nav.proxy" },
   { id: "about", icon: Info, key: "settings.nav.about" },
 ];
 
-// Real dsh credential state: which key envs are already stored on disk.
-const storedKeys = ref<string[]>([]);
-const saveError = ref("");
-// No fallback env: with no provider chosen there is no credential name to write,
-// and defaulting to DEEPSEEK_API_KEY would file someone else's key under DeepSeek.
-const activeEnv = computed(
-  () => PROVIDERS.find((p) => p.id === modelConfig.provider)?.apiKeyEnv ?? ""
-);
-const keyStored = computed(() => storedKeys.value.includes(activeEnv.value));
-const providerOptions = computed<SelectOption[]>(() =>
-  PROVIDERS.map((p) => ({ value: p.id, label: p.label }))
-);
-
-async function refreshKeys(): Promise<void> {
-  try {
-    storedKeys.value = await api.listCredentialKeys();
-  } catch {
-    storedKeys.value = [];
-  }
-}
-watch(open, (v) => {
-  if (v) refreshKeys();
-});
-
-const savedFlash = ref(false);
-async function onSaveModel(): Promise<void> {
-  saveError.value = "";
-  saveModelConfig();
-  const key = modelConfig.apiKey.trim();
-  if (key) {
-    if (!activeEnv.value) {
-      saveError.value = t("settings.model.noProvider");
-      return;
-    }
-    try {
-      await api.setCredential(activeEnv.value, key);
-      modelConfig.apiKey = ""; // secret now lives in ~/.dsh/.credentials.yaml
-      await refreshKeys();
-    } catch (e) {
-      saveError.value = String(e);
-      return;
-    }
-  }
-  savedFlash.value = true;
-  setTimeout(() => (savedFlash.value = false), 1500);
-}
-
 function swatch(vars: Record<string, string>, key: string): string {
   return `hsl(${vars[key]})`;
-}
-
-function pickProvider(id: string): void {
-  const p = PROVIDERS.find((x) => x.id === id);
-  if (!p) return;
-  modelConfig.provider = id;
-  if (p.models.length && !p.models.includes(modelConfig.defaultModel)) {
-    modelConfig.defaultModel = p.models[0];
-  }
 }
 </script>
 
@@ -95,14 +48,28 @@ function pickProvider(id: string): void {
       <nav class="w-44 shrink-0 border-r border-border bg-toolbar py-2">
         <button
           v-for="n in nav"
-          :key="n.id"
+          :key="n.key"
           type="button"
+          :disabled="!n.id"
+          :title="n.id ? undefined : t('settings.plannedHint')"
           class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[14px] transition-colors"
-          :class="section === n.id ? 'bg-selection text-selection-foreground' : 'text-foreground/85 hover:bg-accent'"
-          @click="section = n.id"
+          :class="
+            !n.id
+              ? 'cursor-not-allowed text-muted-foreground/60'
+              : section === n.id
+                ? 'bg-selection text-selection-foreground'
+                : 'text-foreground/85 hover:bg-accent'
+          "
+          @click="n.id && (section = n.id)"
         >
-          <component :is="n.icon" class="h-4 w-4" :stroke-width="1.75" />
-          {{ t(n.key) }}
+          <component :is="n.icon" class="h-4 w-4 shrink-0" :stroke-width="1.75" />
+          <span class="min-w-0 truncate">{{ t(n.key) }}</span>
+          <span
+            v-if="!n.id"
+            class="ml-auto shrink-0 rounded-sm border border-border px-1 py-[1px] text-[11px] leading-none"
+          >
+            {{ t('settings.planned') }}
+          </span>
         </button>
       </nav>
 
@@ -153,47 +120,12 @@ function pickProvider(id: string): void {
           </GroupBox>
         </template>
 
-        <!-- MODEL & API -->
+        <!-- MODEL & API — one box. The provider dropdown carries the launcher
+             default, every provider's fields, the multi-key store, the local-runtime
+             probe and dsh's credential line; the section owns its own load/save
+             cycle, so this dialog holds no provider or key state at all. -->
         <template v-else-if="section === 'model'">
-          <GroupBox :title="t('settings.model.title')">
-            <p class="mb-3 text-[13px] text-muted-foreground">{{ t('settings.model.desc') }}</p>
-            <div class="grid grid-cols-[120px_1fr] items-center gap-x-3 gap-y-3">
-              <label class="text-[14px] text-foreground/85">{{ t('settings.model.provider') }}</label>
-              <Select
-                :model-value="modelConfig.provider"
-                :options="providerOptions"
-                @update:model-value="pickProvider"
-              />
-
-              <label class="text-[14px] text-foreground/85">{{ t('settings.model.apiKey') }}</label>
-              <div class="flex flex-col gap-1">
-                <Input
-                  v-model="modelConfig.apiKey"
-                  type="password"
-                  :placeholder="keyStored ? '•••••••• (已保存到 ~/.dsh)' : 'sk-...'"
-                  class="font-mono"
-                />
-                <span class="inline-flex items-center gap-1 text-[12px]" :class="keyStored ? 'text-emerald-400' : 'text-muted-foreground'">
-                  <template v-if="!activeEnv">{{ t('settings.model.noProvider') }}</template>
-                  <template v-else-if="keyStored">
-                    <Check class="h-3 w-3 shrink-0" />
-                    {{ activeEnv }} 已写入 ~/.dsh/.credentials.yaml（输入新值可覆盖）
-                  </template>
-                  <template v-else>将写入 dsh 凭据文件 {{ activeEnv }}</template>
-                </span>
-              </div>
-
-              <label class="text-[14px] text-foreground/85">{{ t('settings.model.defaultModel') }}</label>
-              <Input v-model="modelConfig.defaultModel" placeholder="deepseek-v4-flash" />
-            </div>
-            <div class="mt-4 flex items-center gap-3">
-              <Button variant="primary" @click="onSaveModel">{{ t('settings.model.save') }}</Button>
-              <span v-if="savedFlash" class="flex items-center gap-1 text-[13px] text-emerald-400">
-                <Check class="h-3.5 w-3.5" /> {{ t('settings.model.saved') }}
-              </span>
-              <span v-if="saveError" class="text-[13px] text-destructive">{{ saveError }}</span>
-            </div>
-          </GroupBox>
+          <ProvidersSection />
         </template>
 
         <!-- MARKET SOURCES — the decentralized feed list; the section owns its

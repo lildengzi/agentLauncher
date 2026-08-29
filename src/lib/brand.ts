@@ -15,6 +15,15 @@ import {
   siOllama,
   siOpenrouter,
   siOpencode,
+  siPerplexity,
+  siHuggingface,
+  siMeta,
+  siMetaai,
+  siMinimax,
+  siReplicate,
+  siAlibabacloud,
+  siBaidu,
+  siBytedance,
 } from "simple-icons";
 
 // OpenAI was removed from simple-icons >=15 for trademark reasons.
@@ -38,36 +47,71 @@ function b(icon: { path: string; hex: string; title: string }): Brand {
 }
 
 // Ordered rules: first regex to match the model id wins.
+// Covers every provider that has a real icon in simple-icons@16.28 plus
+// vendored OpenAI. Free-form `provider`/`model` strings still work —
+// unmatched values fall back to the Lucide `bot` avatar (see Avatar.vue).
 const MODEL_RULES: { re: RegExp; brand: Brand }[] = [
   { re: /deepseek/i, brand: b(siDeepseek) },
   { re: /claude/i, brand: b(siClaude) },
   { re: /gpt|openai|^o[13](-|\b)|codex/i, brand: b(siOpenai) },
   { re: /gemini|palm|bison/i, brand: b(siGooglegemini) },
-  { re: /qwen|tongyi/i, brand: b(siQwen) },
+  { re: /qwen|tongyi|alibaba/i, brand: b(siQwen) },
   { re: /mistral|mixtral|codestral/i, brand: b(siMistralai) },
   { re: /kimi|moonshot/i, brand: b(siMoonshotai) },
-  { re: /llama|ollama/i, brand: b(siOllama) },
+  // Perplexity sonar family: sonar, sonar-pro, sonar-reasoning
+  { re: /perplexity|sonar/i, brand: b(siPerplexity) },
+  { re: /minimax/i, brand: b(siMinimax) },
+  { re: /doubao|bytedance/i, brand: b(siBytedance) },
+  { re: /ernie|baidu/i, brand: b(siBaidu) },
+  { re: /ollama/i, brand: b(siOllama) },
+  { re: /llama/i, brand: b(siMetaai) },
+  { re: /huggingface/i, brand: b(siHuggingface) },
+  { re: /replicate/i, brand: b(siReplicate) },
   { re: /opencode/i, brand: b(siOpencode) },
 ];
 
 const PROVIDER_BRANDS: Record<string, Brand> = {
+  // DeepSeek
   deepseek: b(siDeepseek),
   "deepseek-official": b(siDeepseek),
+  // Anthropic / Claude
   anthropic: b(siAnthropic),
   claude: b(siClaude),
   "claude-code": b(siClaudecode),
-  google: b(siGooglegemini),
-  gemini: b(siGooglegemini),
-  ollama: b(siOllama),
-  openrouter: b(siOpenrouter),
-  mistral: b(siMistralai),
+  // OpenAI family (vendored)
   openai: b(siOpenai),
   "openai-compatible": b(siOpenai),
   codex: b(siOpenai),
-  opencode: b(siOpencode),
+  // Google
+  google: b(siGooglegemini),
+  gemini: b(siGooglegemini),
+  // Alibaba / Qwen
   qwen: b(siQwen),
+  tongyi: b(siQwen),
+  alibaba: b(siAlibabacloud),
+  "alibaba-cloud": b(siAlibabacloud),
+  alibabacloud: b(siAlibabacloud),
+  // Others with icons
+  mistral: b(siMistralai),
   moonshot: b(siMoonshotai),
   kimi: b(siMoonshotai),
+  perplexity: b(siPerplexity),
+  minimax: b(siMinimax),
+  doubao: b(siBytedance),
+  bytedance: b(siBytedance),
+  baidu: b(siBaidu),
+  ernie: b(siBaidu),
+  // Meta / Llama
+  meta: b(siMeta),
+  "meta-ai": b(siMetaai),
+  metaai: b(siMetaai),
+  llama: b(siMetaai),
+  ollama: b(siOllama),
+  // Infra / aggregators
+  huggingface: b(siHuggingface),
+  replicate: b(siReplicate),
+  openrouter: b(siOpenrouter),
+  opencode: b(siOpencode),
 };
 
 /** Brand for a model id (e.g. "deepseek-reasoner" → DeepSeek), or null. */

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AgentsDoc,
   DshProfile,
   EngineInfo,
   InstGroups,
@@ -8,10 +9,12 @@ import type {
   InstallSpec,
   InstanceExtensions,
   LauncherConfig,
+  LocalLlm,
   MarketPage,
   MarketQuery,
   McpServerEntry,
   NewInstance,
+  ProviderView,
   RuntimeLogEvent,
   RuntimeStatusEvent,
   SourceStatus,
@@ -65,6 +68,16 @@ export const api = {
   /** Replace the whole `mcpServers` map of an instance's mcp.json. */
   setInstanceMcp: (id: string, servers: McpServerEntry[]) =>
     invoke<void>("set_instance_mcp", { id, servers }),
+  /**
+   * The instance's `AGENTS.md` (system prompt / behaviour rules) and whether the
+   * file is there at all. Its own call rather than part of
+   * `readInstanceExtensions`: that one waits on a dsh plugin probe and is re-issued
+   * on every engine/profile change, which would discard a half-typed prompt.
+   */
+  readInstanceAgents: (id: string) => invoke<AgentsDoc>("read_instance_agents", { id }),
+  /** Overwrite `AGENTS.md` verbatim; creates it if the instance has none yet. */
+  writeInstanceAgents: (id: string, text: string) =>
+    invoke<void>("write_instance_agents", { id, text }),
   /** Delete one skill directory under `instances/<id>/skills/`. */
   removeInstanceSkill: (id: string, name: string) =>
     invoke<void>("remove_instance_skill", { id, name }),
@@ -90,6 +103,30 @@ export const api = {
   getMarketSources: () => invoke<SourcesDoc>("get_market_sources"),
   /** Persist the source list (built-ins are restored, `builtin` is not caller-set). */
   setMarketSources: (doc: SourcesDoc) => invoke<void>("set_market_sources", { doc }),
+
+  // ---- providers & API keys (~/.agentlauncher/providers.json, 0600) -------
+  /** Every provider, keys masked to a fingerprint. Never returns a secret. */
+  getProviders: () => invoke<ProviderView[]>("get_providers"),
+  /**
+   * Persist provider metadata. Key *values* are not part of this payload and cannot
+   * be — the frontend never received them; the backend carries each one over from
+   * disk by `(provider id, alias)`. Renaming an alias therefore clears that key.
+   */
+  setProviders: (providers: ProviderView[]) => invoke<void>("set_providers", { providers }),
+  /** Set one key's value, or delete the key by passing an empty string. */
+  setProviderKey: (provider: string, alias: string, value: string) =>
+    invoke<void>("set_provider_key", { provider, alias, value }),
+  /** Probe loopback ports for Ollama / LM Studio / vLLM / llama.cpp. No credentials,
+   *  no proxy, nothing leaves the machine. Runtimes that are not up are absent. */
+  detectLocalLlms: () => invoke<LocalLlm[]>("detect_local_llms"),
+  /**
+   * Ask one provider's own API which models a stored key can see. The only outbound
+   * request in the launcher that carries a secret — the key is read from disk in the
+   * backend, so it still never passes through here. `alias` empty ⇒ the provider's
+   * first enabled key. The list is returned, not saved.
+   */
+  fetchProviderModels: (provider: string, alias = "") =>
+    invoke<string[]>("fetch_provider_models", { provider, alias }),
 
   // ---- real dsh config wiring --------------------------------------------
   /** Names (not values) of credentials stored in ~/.dsh/.credentials.yaml. */

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
-import { Save, SlidersHorizontal, BrainCircuit, ListChecks, Wrench, Puzzle, GraduationCap, Plug } from "lucide-vue-next";
+import { Save, SlidersHorizontal, BrainCircuit, ListChecks, Wrench, Puzzle, GraduationCap, Plug, ScrollText } from "lucide-vue-next";
 import Dialog from "@/components/ui/Dialog.vue";
 import DialogPanel from "@/components/ui/DialogPanel.vue";
 import Button from "@/components/ui/Button.vue";
@@ -13,6 +13,7 @@ import AppIcon from "@/components/ui/AppIcon.vue";
 import PluginsSection from "@/components/edit/PluginsSection.vue";
 import SkillsSection from "@/components/edit/SkillsSection.vue";
 import McpSection from "@/components/edit/McpSection.vue";
+import AgentsSection from "@/components/edit/AgentsSection.vue";
 import MarketDialog from "@/components/market/MarketDialog.vue";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -24,6 +25,7 @@ import type {
   Instance,
   InstanceExtensions,
   NewInstance,
+  ProviderView,
 } from "@/types";
 
 const { t } = useI18n();
@@ -39,7 +41,7 @@ const props = defineProps<{
 const open = defineModel<boolean>("open", { default: false });
 const emit = defineEmits<{ saved: [instance: Instance] }>();
 
-type Section = "general" | "model" | "runtime" | "extensions" | "skills" | "mcp" | "task";
+type Section = "general" | "model" | "runtime" | "extensions" | "skills" | "mcp" | "agents" | "task";
 const section = ref<Section>("general");
 
 // Known engines, used as a fallback when live detection fails so the picker is
@@ -61,6 +63,10 @@ const profiles = ref<DshProfile[]>([
   { name: "headless", web: false },
   { name: "web", web: true },
 ]);
+/** The provider list, for the key-binding picker. Read-only here — this dialog
+ *  binds a *reference*; the rows themselves are edited in Settings. Keys arrive
+ *  as fingerprints, so nothing secret enters this component either. */
+const providers = ref<ProviderView[]>([]);
 watch(
   open,
   async (v) => {
@@ -74,6 +80,10 @@ watch(
       .catch(() => {
         /* keep fallback */
       });
+    api
+      .getProviders()
+      .then((found) => (providers.value = found))
+      .catch(() => (providers.value = []));
     try {
       const found = await api.listDshProfiles();
       if (found.length) profiles.value = found;
@@ -96,6 +106,7 @@ interface FormState {
   profile: string;
   provider: string;
   model: string;
+  api_key_ref: string;
   env_policy: string;
   custom_bin: string;
   default_task: string;
@@ -114,6 +125,9 @@ function defaults(): FormState {
     // Empty = the selected framework's own default (see "空值即省略" contract).
     // The launcher-wide default is owned by config.defaults, not hardcoded here.
     model: config.defaults.model || "",
+    // Empty = let the launcher match `provider` against a provider id, and inject
+    // nothing if that misses. Binding is opt-in.
+    api_key_ref: "",
     env_policy: "autodetect",
     custom_bin: "",
     default_task: "",
@@ -141,6 +155,7 @@ watch(
       form.profile = props.instance.profile;
       form.provider = props.instance.provider || "";
       form.model = props.instance.model;
+      form.api_key_ref = props.instance.api_key_ref || "";
       form.env_policy = props.instance.runtime?.env_policy || "autodetect";
       form.custom_bin = props.instance.runtime?.custom_bin || "";
       form.default_task = props.instance.default_task;
@@ -169,6 +184,7 @@ async function save() {
     profile: form.profile,
     provider: form.provider.trim(),
     model: form.model,
+    api_key_ref: form.api_key_ref,
     runtime: {
       engine: form.engine,
       env_policy: form.env_policy,
@@ -206,6 +222,9 @@ const navItems = [
   { key: "extensions" as const, icon: Puzzle, label: () => t("edit.nav.extensions") },
   { key: "skills" as const, icon: GraduationCap, label: () => t("edit.nav.skills") },
   { key: "mcp" as const, icon: Plug, label: () => t("edit.nav.mcp") },
+  // After MCP and before 任务, following the spec's own row order
+  // (扩展插件 → Skills → MCP → 备注/人设与契约).
+  { key: "agents" as const, icon: ScrollText, label: () => t("edit.nav.agents") },
   { key: "task" as const, icon: ListChecks, label: () => t("edit.nav.task") },
 ];
 
@@ -262,6 +281,12 @@ function browseMarket(kind: ExtensionKind): void {
   marketOpen.value = true;
 }
 
+// The pages that read or write files under `instances/<id>/`. They need a
+// directory on disk, which an unsaved instance has not got yet, so they say so
+// rather than rendering an editor whose save cannot land anywhere.
+const FILE_SECTIONS: Section[] = ["extensions", "skills", "mcp", "agents"];
+const needsInstanceDir = computed(() => FILE_SECTIONS.includes(section.value));
+
 // The dsh `profile` concept only applies to the dsh engine; other engines hide it.
 const isDsh = computed(() => form.engine === "dsh");
 // Live install status of the currently selected engine, for a hint line.
@@ -308,6 +333,44 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
   { value: "autodetect", label: t("edit.runtime.autodetect") },
   { value: "isolated", label: t("edit.runtime.isolated") },
 ]);
+
+// The key-binding list, flattened: one row per provider (rotate its enabled keys)
+// followed by one row per key of that provider (pin exactly that one). The empty
+// row first, because not binding is the default and has to be reachable again.
+//
+// A valueless or disabled key is still listed, hinted rather than hidden: a pin
+// that cannot be honoured fails the launch loudly, and finding out why is easier
+// when the row you picked says so.
+const apiKeyRefOptions = computed<SelectOption[]>(() => {
+  const out: SelectOption[] = [{ value: "", label: t("edit.model.keyRefAuto") }];
+  for (const p of providers.value) {
+    if (!p.enabled && p.id !== form.api_key_ref.split("/")[0]) continue;
+    const name = p.label || p.id;
+    const usable = p.keys.filter((k) => k.enabled && k.has_value).length;
+    out.push({
+      value: p.id,
+      label: name,
+      hint: usable
+        ? t("edit.model.keyRefRotate").replace("{n}", String(usable))
+        : t("edit.model.keyRefNoKeys"),
+      warn: !usable,
+    });
+    for (const k of p.keys) {
+      const broken = !k.enabled || !k.has_value;
+      out.push({
+        value: `${p.id}/${k.alias}`,
+        label: `${name} / ${k.alias}`,
+        hint: !k.has_value
+          ? t("providers.keyEmpty")
+          : k.enabled
+            ? undefined
+            : t("edit.model.keyRefDisabled"),
+        warn: broken,
+      });
+    }
+  }
+  return out;
+});
 </script>
 
 <template>
@@ -408,6 +471,17 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
 
             <Label for="inst-model">{{ t("edit.model") }}</Label>
             <Input id="inst-model" v-model="form.model" />
+
+            <!-- Which stored key this instance launches with. A reference: the value
+                 is read from providers.json in the backend at spawn time, which is
+                 the only moment the launcher can choose a credential at all. -->
+            <Label for="inst-keyref">{{ t("edit.model.keyRef") }}</Label>
+            <div>
+              <Select id="inst-keyref" v-model="form.api_key_ref" :options="apiKeyRefOptions" />
+              <p class="mt-1 text-[13px] text-muted-foreground">
+                {{ t("edit.model.keyRefHint") }}
+              </p>
+            </div>
           </div>
         </GroupBox>
 
@@ -491,10 +565,10 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
           </div>
         </GroupBox>
 
-        <!-- Extensions / Skills / MCP — the three per-instance extension views.
-             They need a directory on disk, which an unsaved instance has not got
-             yet, so they say so rather than rendering an editor that cannot save. -->
-        <template v-if="section === 'extensions' || section === 'skills' || section === 'mcp'">
+        <!-- Extensions / Skills / MCP / AGENTS.md — the per-instance file pages.
+             AGENTS.md loads itself (see AgentsSection.vue); the other three share
+             one `extensions` read so they cannot disagree about the same state. -->
+        <template v-if="needsInstanceDir">
           <div
             v-if="!instanceId"
             class="rounded border border-border bg-muted/40 px-3 py-2 text-[13px] text-muted-foreground"
@@ -519,13 +593,14 @@ const envPolicyOptions = computed<SelectOption[]>(() => [
               @browse="browseMarket"
             />
             <McpSection
-              v-else
+              v-else-if="section === 'mcp'"
               :instance-id="instanceId"
               :extensions="extensions"
               :loading="extLoading"
               @changed="loadExtensions"
               @browse="browseMarket"
             />
+            <AgentsSection v-else :instance-id="instanceId" />
           </template>
         </template>
 

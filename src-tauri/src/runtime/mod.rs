@@ -113,6 +113,7 @@ pub(crate) fn test_instance(engine: &str, provider: &str, model: &str) -> Instan
         profile: "headless".into(),
         provider: provider.into(),
         model: model.into(),
+        api_key_ref: String::new(),
         default_task: String::new(),
         runtime: RuntimeConfig {
             engine: engine.into(),

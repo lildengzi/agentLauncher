@@ -61,6 +61,11 @@ export interface Instance {
   provider: string;
   /** underlying model target, e.g. "deepseek-reasoner". */
   model: string;
+  /** Which stored API key this instance launches with: `"<provider>"` rotates that
+   *  provider's enabled keys, `"<provider>/<alias>"` pins one, `""` lets the backend
+   *  try matching `provider` against a provider id and inject nothing if it cannot.
+   *  A reference, never a secret — values live only in the backend's providers.json. */
+  api_key_ref: string;
   /** default task text prefilled when launching. */
   default_task: string;
   /** runtime/environment override (missing ⇒ autodetect, no custom binary). */
@@ -78,6 +83,8 @@ export interface NewInstance {
   profile: string;
   provider: string;
   model: string;
+  /** See `Instance.api_key_ref`; empty is the normal case. */
+  api_key_ref: string;
   default_task: string;
   runtime: RuntimeConfig;
 }
@@ -192,6 +199,16 @@ export interface InstanceExtensions {
   mcp: McpServerEntry[];
 }
 
+/** The instance's `AGENTS.md` — its system prompt and behaviour rules.
+ *
+ *  `exists` is not `text !== ""`: an instance scaffolded before the launcher
+ *  seeded the file has none at all, and that is a different thing to tell the
+ *  user than an empty one. */
+export interface AgentsDoc {
+  text: string;
+  exists: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Decentralized extension market. Mirrors src-tauri/src/market/{mod,sources}.rs.
 // No single registry exists, so every index is a row in ~/.agentlauncher/
@@ -226,6 +243,54 @@ export interface SourceDef {
 export interface SourcesDoc {
   format_version: number;
   sources: SourceDef[];
+}
+
+// ---- providers & API keys (~/.agentlauncher/providers.json, mode 0600) -----
+// The frontend deliberately has no type for a key *value*. There is no command
+// that returns one: a key is identified here by its alias and its fingerprint,
+// written by `setProviderKey`, and read only by the backend at launch time.
+
+/** One stored API key, as much of it as the UI is allowed to know. */
+export interface ProviderKeyView {
+  /** The key's name and identity — what an instance binds to, and the join key when
+   *  the list is saved. Renaming it drops the stored value, since the rename leaves
+   *  nothing on disk to match against. */
+  alias: string;
+  /** A disabled key is kept but skipped by rotation and refused to a pinned launch. */
+  enabled: boolean;
+  /** `sk-a…9f2a`, or dots when the value is too short to hint at safely; empty when
+   *  the row has no value yet. This is the most the eye button can ever reveal. */
+  fingerprint: string;
+  has_value: boolean;
+}
+
+/** One provider row. Every field but `id` may be empty — empty means "omit", never
+ *  "guess", the same contract the engine adapters follow for provider/model flags. */
+export interface ProviderView {
+  id: string;
+  label: string;
+  /** Env var the engine reads the key from; empty ⇒ nothing can be injected. */
+  api_key_env: string;
+  base_url: string;
+  /** Where `base_url` is injected at launch; empty ⇒ it is not injected at all. */
+  base_url_env: string;
+  /** "bearer" | "x-api-key" — how the model listing authenticates, nothing else. */
+  auth_style: string;
+  models: string[];
+  enabled: boolean;
+  /** Shipped with the launcher: disable-able, not delete-able. Asserted by the
+   *  backend on every save, so a new row saying `false` is just the wire shape. */
+  builtin: boolean;
+  keys: ProviderKeyView[];
+}
+
+/** A local runtime that answered a loopback probe. */
+export interface LocalLlm {
+  id: string;
+  label: string;
+  /** OpenAI-compatible root, ready to paste into a provider row. */
+  base_url: string;
+  models: string[];
 }
 
 /** How an item is actually installed. `method` is a string, not a union, so an
