@@ -13,9 +13,10 @@
 // unreachable, it just stopped being the first thing on screen.
 //
 // The shape is master-detail: the 服务商 dropdown picks a row, and only that row's
-// fields exist on screen. 「＋ 新增服务商」 and 「探测本机运行时」 are items in that
-// same dropdown, which is what keeps the master row one control wide; both leave the
-// rows unsaved, so neither can change how anything launches until 保存 is pressed.
+// fields exist on screen. 「＋ 新增服务商」, 「探测本机运行时」 and 「从已装的 Agent 导入」
+// are items in that same dropdown, which is what keeps the master row one control
+// wide; all three leave the rows unsaved, so none of them can change how anything
+// launches until 保存 is pressed.
 //
 // The invariant from the previous layout is unchanged and worth restating: **the
 // frontend never holds a key value.** `getProviders` returns fingerprints,
@@ -24,11 +25,16 @@
 // no plaintext on this side to reveal. Changing the selection clears the key drafts
 // for the same reason: a half-typed secret has no business following the selection
 // around the list.
+//
+// 「导入密钥」 is the one apparent exception and is not one: it names a provider and the
+// backend copies that key from the other agent's config file into providers.json. The
+// value never enters this component in either direction — see `providers::adopt`.
 import { computed, onMounted, ref, watch } from "vue";
 import {
   Check,
   ChevronDown,
   ChevronRight,
+  Download,
   Eye,
   EyeOff,
   Globe,
@@ -42,14 +48,15 @@ import Select, { type SelectOption } from "@/components/ui/Select.vue";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { modelConfig } from "@/lib/settings";
-import type { LocalLlm, ProviderView } from "@/types";
+import type { DetectedProvider, LocalLlm, ProviderView } from "@/types";
 
 const { t } = useI18n();
 
-/** Sentinel dropdown values. The two "add" actions live inside the list so the
+/** Sentinel dropdown values. The three "add" actions live inside the list so the
  *  master row stays exactly one control wide. */
 const ADD = "__add";
 const PROBE = "__probe";
+const ADOPT = "__adopt";
 /** The alias a first key gets. A key needs *a* name to be addressable, and asking
  *  the user to invent one was among the things nobody understood. */
 const PRIMARY = "main";
@@ -78,6 +85,12 @@ const fetching = ref(false);
 const fetchNote = ref("");
 const probing = ref(false);
 const probeNote = ref("");
+/** What the machine's *other* agents already have configured. Read once on mount so
+ *  the 导入 item can say how much is there before it is pressed, and re-read by the
+ *  action itself. Never adopted implicitly — a detected provider becomes a row only
+ *  when the user picks the dropdown item. */
+const detected = ref<DetectedProvider[]>([]);
+const keyNote = ref("");
 const newModel = ref("");
 const addingModel = ref(false);
 
@@ -150,12 +163,30 @@ const providerOptions = computed<SelectOption[]>(() => {
         : undefined,
     warn: !r.enabled,
   }));
-  // The two actions, last. `Select` has no separator concept, so the labels carry
-  // the distinction (a leading ＋ / 🔍) instead of a divider line.
+  // The actions, last. `Select` has no separator concept, so the labels carry
+  // the distinction (a leading ＋ / 🔍 / ⤓) instead of a divider line.
   out.push({ value: ADD, label: `＋ ${t("providers.add")}` });
   out.push({ value: PROBE, label: `🔍 ${t("providers.probeItem")}`, hint: t("providers.localPorts") });
+  out.push({
+    value: ADOPT,
+    label: `⤓ ${t("providers.adoptItem")}`,
+    hint: detected.value.length
+      ? t("providers.adoptAvailable").replace("{n}", String(detected.value.length))
+      : t("providers.adoptHint"),
+  });
   return out;
 });
+
+/** The detection result for the row on screen, matched the way the backend will match
+ *  it — by the id this row is going to have. This is what decides whether the 导入密钥
+ *  button exists, and it names the agent the key would come from. */
+const detectedFor = computed<DetectedProvider | null>(() => {
+  const row = selected.value;
+  if (!row) return null;
+  const id = effId(row);
+  return (id && detected.value.find((d) => d.id === id)) || null;
+});
+const importSource = computed(() => detectedFor.value?.sources.join(" · ") ?? "");
 
 const isDefault = computed(
   () => !!selected.value && !!effId(selected.value) && effId(selected.value) === modelConfig.provider
@@ -223,6 +254,10 @@ onMounted(async () => {
   // Open on the launcher default when there is one. Nothing is *written* here.
   const i = rows.value.findIndex((r) => effId(r) && effId(r) === modelConfig.provider);
   selIndex.value = i >= 0 ? i : 0;
+  // Reading a few config files belonging to agents that are on PATH — no network, no
+  // disk scan, and nothing adopted. It runs unprompted only so the 导入 item can say
+  // whether there is anything to import; failure just means the item says less.
+  detected.value = await api.detectAgentProviders().catch(() => []);
 });
 
 // Every draft is scoped to the row on screen; none of it follows the selection.
@@ -231,6 +266,7 @@ watch(selIndex, () => {
   keyAlias.value = "";
   shown.value = {};
   fetchNote.value = "";
+  keyNote.value = "";
   newModel.value = "";
   addingModel.value = false;
   dshDraft.value = "";
@@ -287,6 +323,10 @@ function onPickProvider(v: string): void {
   }
   if (v === PROBE) {
     void probeLocal();
+    return;
+  }
+  if (v === ADOPT) {
+    void adoptAgents();
     return;
   }
   const i = Number(v);
@@ -458,6 +498,88 @@ function adoptLocal(llm: LocalLlm): number {
   });
 }
 
+/** The other 导入 item: providers the machine's own agents already have.
+ *
+ *  This is the answer to "why type DeepSeek's Base URL again when omp already knows
+ *  it". It reads their config files — only for agents on PATH — and folds the result
+ *  in as drafts, exactly like the loopback probe: nothing is saved, so nothing can
+ *  change how an instance launches until 保存.
+ *
+ *  Keys are *not* part of this. A detected key stays on disk until the per-provider
+ *  「导入密钥」 button asks for it by id, which is what keeps this action free of
+ *  secrets in both directions. */
+async function adoptAgents(): Promise<void> {
+  if (probing.value) return;
+  probing.value = true;
+  probeNote.value = t("providers.adopting");
+  error.value = "";
+  try {
+    const found = await api.detectAgentProviders();
+    detected.value = found;
+    if (!found.length) {
+      probeNote.value = t("providers.adoptNone");
+      return;
+    }
+    let first = -1;
+    for (const p of found) {
+      const i = adoptDetected(p);
+      if (first < 0) first = i;
+    }
+    if (first >= 0) selIndex.value = first;
+    probeNote.value = t("providers.adopted").replace("{n}", String(found.length));
+  } catch (e) {
+    probeNote.value = "";
+    error.value = String(e);
+  } finally {
+    probing.value = false;
+  }
+}
+
+/** Fold one detected provider into the list, reusing its row when the id is already
+ *  there — which is the normal case, since `deepseek` and `openai` ship as builtins.
+ *  Empty detected fields never overwrite something the user typed: an agent that knows
+ *  the key but not the endpoint (dsh, opencode's auth store) must not blank the URL. */
+function adoptDetected(p: DetectedProvider): number {
+  const i = rows.value.findIndex((r) => effId(r) === p.id);
+  if (i >= 0) {
+    const row = rows.value[i];
+    if (p.base_url) row.base_url = p.base_url;
+    if (p.api_key_env && !row.api_key_env) row.api_key_env = p.api_key_env;
+    for (const m of p.models) if (!row.models.includes(m)) row.models.push(m);
+    row.enabled = true;
+    return i;
+  }
+  return addRow({
+    id: p.id,
+    label: p.label || p.id,
+    base_url: p.base_url,
+    api_key_env: p.api_key_env,
+    models: [...p.models],
+  });
+}
+
+/** Copy the detected key into providers.json, by id — the value moves disk-to-disk in
+ *  the backend and is never sent from here. Metadata is flushed first for the same
+ *  reason `saveKey` does it: `set_key` addresses a provider that exists on disk, and a
+ *  row that was just adopted does not yet. */
+async function importKey(): Promise<void> {
+  const row = selected.value;
+  const d = detectedFor.value;
+  if (!row || !d?.has_key) return;
+  const id = effId(row);
+  if (!id) return;
+  error.value = "";
+  keyNote.value = "";
+  try {
+    if (dirty.value) await persist();
+    const n = await api.importAgentProviderKeys([id]);
+    await load(true);
+    if (n) keyNote.value = t("providers.keyImported");
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
 /** dsh only. Writes one `NAME: value` line into ~/.dsh/.credentials.yaml (0600) —
  *  a different file from providers.json, because dsh reads that one and nothing else. */
 async function writeDsh(): Promise<void> {
@@ -531,40 +653,62 @@ async function writeDsh(): Promise<void> {
         />
 
         <label class="pt-1.5 text-[14px] text-foreground/85">API Key</label>
-        <div class="flex min-w-0 items-center gap-2">
-          <!-- The most this side can ever show. There is no plaintext here to reveal,
-               so 可见 flips a fingerprint against dots. -->
-          <span class="w-24 shrink-0 truncate font-mono text-[12px] text-muted-foreground">
-            <template v-if="!primary?.has_value">{{ t("providers.keyEmpty") }}</template>
-            <template v-else>{{ shown[primaryAlias] ? primary.fingerprint : "••••••••" }}</template>
-          </span>
-          <Button
-            v-if="primary?.has_value"
-            variant="ghost"
-            size="icon"
-            class="h-6 w-6 shrink-0"
-            :title="t('providers.reveal')"
-            @click="shown[primaryAlias] = !shown[primaryAlias]"
-          >
-            <EyeOff v-if="shown[primaryAlias]" class="h-3.5 w-3.5" />
-            <Eye v-else class="h-3.5 w-3.5" />
-          </Button>
-          <Input
-            v-model="keyDraft[primaryAlias]"
-            type="password"
-            class="h-7 min-w-0 flex-1 font-mono"
-            :placeholder="primary?.has_value ? t('providers.keyReplace') : 'sk-...'"
-            @keydown.enter.prevent="saveKey(primaryAlias)"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            class="shrink-0"
-            :disabled="!(keyDraft[primaryAlias] ?? '').trim()"
-            @click="saveKey(primaryAlias)"
-          >
-            {{ t("common.save") }}
-          </Button>
+        <div class="flex min-w-0 flex-col gap-1">
+          <div class="flex min-w-0 items-center gap-2">
+            <!-- The most this side can ever show. There is no plaintext here to reveal,
+                 so 可见 flips a fingerprint against dots. -->
+            <span class="w-24 shrink-0 truncate font-mono text-[12px] text-muted-foreground">
+              <template v-if="!primary?.has_value">{{ t("providers.keyEmpty") }}</template>
+              <template v-else>{{ shown[primaryAlias] ? primary.fingerprint : "••••••••" }}</template>
+            </span>
+            <Button
+              v-if="primary?.has_value"
+              variant="ghost"
+              size="icon"
+              class="h-6 w-6 shrink-0"
+              :title="t('providers.reveal')"
+              @click="shown[primaryAlias] = !shown[primaryAlias]"
+            >
+              <EyeOff v-if="shown[primaryAlias]" class="h-3.5 w-3.5" />
+              <Eye v-else class="h-3.5 w-3.5" />
+            </Button>
+            <Input
+              v-model="keyDraft[primaryAlias]"
+              type="password"
+              class="h-7 min-w-0 flex-1 font-mono"
+              :placeholder="primary?.has_value ? t('providers.keyReplace') : 'sk-...'"
+              @keydown.enter.prevent="saveKey(primaryAlias)"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              class="shrink-0"
+              :disabled="!(keyDraft[primaryAlias] ?? '').trim()"
+              @click="saveKey(primaryAlias)"
+            >
+              {{ t("common.save") }}
+            </Button>
+          </div>
+          <!-- Only when one of the installed agents actually holds a key for this
+               provider. It says which agent, because "导入" from an unnamed source is
+               a credential appearing out of nowhere. -->
+          <div v-if="detectedFor?.has_key" class="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              class="shrink-0"
+              :title="t('providers.importKeyHint')"
+              @click="importKey"
+            >
+              <Download class="h-3.5 w-3.5" />
+              {{ t("providers.importKey") }}
+            </Button>
+            <span class="min-w-0 truncate text-[12px] text-muted-foreground">
+              {{ t("providers.adoptFrom") }}
+              <span class="font-mono text-foreground/80">{{ importSource }}</span>
+            </span>
+          </div>
+          <span v-if="keyNote" class="text-[12px] text-emerald-400">{{ keyNote }}</span>
         </div>
 
         <label class="pt-1.5 text-[14px] text-foreground/85">{{ t("providers.models") }}</label>

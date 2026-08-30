@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Instance, RunStatus } from "@/types";
-import { api, onRuntimeStatus } from "@/lib/api";
+import { api, onOpenSettings, onRuntimeStatus } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { config } from "@/lib/launcherConfig";
+import { opensOwnTerminal } from "@/lib/engineList";
 import { instGroups } from "@/lib/instGroups";
 import TopBar from "@/components/TopBar.vue";
 import InstanceGrid from "@/components/InstanceGrid.vue";
 import RightPanel from "@/components/RightPanel.vue";
 import StatusBar from "@/components/StatusBar.vue";
-import EditInstanceDialog from "@/components/EditInstanceDialog.vue";
+import NewInstanceDialog from "@/components/NewInstanceDialog.vue";
 import ChangeGroupDialog from "@/components/ChangeGroupDialog.vue";
 import ConsoleDialog from "@/components/ConsoleDialog.vue";
 import SettingsDialog from "@/components/SettingsDialog.vue";
@@ -22,17 +23,21 @@ const instances = ref<Instance[]>([]);
 const selectedId = ref<string | null>(null);
 const statuses = ref<Record<string, RunStatus>>({});
 const urls = ref<Record<string, string>>({});
-const editOpen = ref(false);
+const createOpen = ref(false);
 const groupOpen = ref(false);
 const consoleOpen = ref(false);
 const settingsOpen = ref(false);
+/** Which settings page to open at; only set when something asks for a specific one
+ *  (an editor window linking to the key store). Empty = leave the dialog's own. */
+const settingsPage = ref("");
 
 let unlistenStatus: (() => void) | null = null;
+let unlistenSettings: (() => void) | null = null;
 
 const dialogOpen = computed(
   // Only real modals belong here. The instance editor is its own window now, and a
   // window must not disable this window's mnemonics.
-  () => editOpen.value || groupOpen.value || consoleOpen.value || settingsOpen.value
+  () => createOpen.value || groupOpen.value || consoleOpen.value || settingsOpen.value
 );
 
 const selectedInstance = computed(
@@ -105,9 +110,14 @@ onMounted(async () => {
       urls.value = rest;
     }
   });
+  // An editor window has no key store of its own — it asks this window to show one.
+  unlistenSettings = await onOpenSettings((page) => {
+    openSettings(page);
+  });
 });
 onBeforeUnmount(() => {
   unlistenStatus?.();
+  unlistenSettings?.();
   window.removeEventListener("keydown", onKey);
   window.removeEventListener("focus", onWindowFocus);
 });
@@ -116,10 +126,17 @@ function onWindowFocus() {
   void loadInstances();
 }
 
+function openSettings(page = "") {
+  // Always set the page, even to "": a stale value from an editor window's
+  // 管理密钥… would otherwise make the toolbar's 设置 button open on 模型与 API.
+  settingsPage.value = page;
+  settingsOpen.value = true;
+}
 function openCreate() {
-  // New Instance stays a modal: a window keyed by the instance id cannot exist
-  // before the id does. Editing an existing one opens its own window instead.
-  editOpen.value = true;
+  // 新建是它自己的对话框，不再是编辑界面的 instance=null 分支：实例还不存在时，插件 /
+  // 技能 / MCP / 人设 都没有目录可落，那四页只能显示「先保存」——点进去才发现是死的。
+  // 新建只问能当场回答的问题（叫什么、哪个 Agent、什么模型），其余归编辑窗口。
+  createOpen.value = true;
 }
 function openEdit() {
   if (selectedId.value) {
@@ -141,7 +158,11 @@ async function start(task?: string) {
   if (!id) return;
   const { [id]: _drop, ...rest } = urls.value;
   urls.value = rest;
-  consoleOpen.value = true;
+  // 只在输出真的会落进控制台时才把它顶出来。交互式实例的对话在用户自己的终端里，
+  // 控制台那边只有一行「用了哪个终端、脚本在哪」的记录——为一行字盖住列表，是把
+  // 启动器摆在会话前面。真出错时状态会变红，控制台按钮还在原处。
+  const inst = instances.value.find((i) => i.id === id);
+  if (!inst || !opensOwnTerminal(inst)) consoleOpen.value = true;
   statuses.value = { ...statuses.value, [id]: "starting" };
   try {
     await api.startInstance(id, task);
@@ -218,7 +239,7 @@ function onKey(e: KeyboardEvent) {
     case "o":
       return hit(() => void openFolder());
     case "n":
-      return hit(() => (settingsOpen.value = true));
+      return hit(() => openSettings());
     case "l":
       return hit(() => void start());
     case "k":
@@ -242,7 +263,7 @@ function onKey(e: KeyboardEvent) {
     <TopBar
       @add="openCreate"
       @folder="openFolder"
-      @settings="settingsOpen = true"
+      @settings="openSettings()"
       @help="openRepo"
     />
     <div class="flex min-h-0 flex-1">
@@ -281,13 +302,13 @@ function onKey(e: KeyboardEvent) {
       @stop="stop"
       @open-web="openWeb"
     />
-    <EditInstanceDialog v-model:open="editOpen" :instance="null" @saved="onSaved" />
+    <NewInstanceDialog v-model:open="createOpen" :groups="groupNames" @saved="onSaved" />
     <ChangeGroupDialog
       v-model:open="groupOpen"
       :instance="selectedInstance"
       :groups="groupNames"
       @saved="onSaved"
     />
-    <SettingsDialog v-model:open="settingsOpen" />
+    <SettingsDialog v-model:open="settingsOpen" :page="settingsPage" />
   </div>
 </template>

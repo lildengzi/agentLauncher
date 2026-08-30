@@ -10,11 +10,15 @@
 //! dsh has no `config`/`model`/`market` subcommands; its state is files:
 //!   * `.credentials.yaml` — a flat `KEY: value` mapping (mode 0600) of credential
 //!     references (e.g. DEEPSEEK_API_KEY) to secret values.
+//!   * `settings.yaml`     — the hot-reloaded user settings document. Its
+//!     `llm-pi-ai: providers:` dict is what *adds* model routes (see
+//!     [`model_routes`]); the launcher only reads it.
 //!   * `profiles/<name>/`   — one profile per dir; `cordis.patch.yml` is the user
 //!     patch layer and `package.json` `dependencies` are the installed plugins.
 //!
 //! The default agent model is the `agent-default-model` plugin's `{provider, model}`
-//! config, overridable per run via `--patch <file>` (written by `model.rs`).
+//! config, overridable per run via `--patch <file>` (written by `model.rs`). Its
+//! `provider` is a dsh **route**, not a launcher provider id — [`model_routes`].
 //!
 //! Plugins are managed with `dsh plugin --profile <name> add|remove <pkg>`, which
 //! forwards to pnpm inside the profile directory. There is no remote plugin market.
@@ -81,6 +85,23 @@ pub fn list_credential_keys() -> Result<Vec<String>, String> {
     keys.sort();
     keys.dedup();
     Ok(keys)
+}
+
+/// Credential `(name, value)` pairs, for backend code that must read a value.
+///
+/// **Not a command, and `pub(crate)` for that reason.** `list_credential_keys` is the
+/// version the UI gets, and the difference between the two is the whole invariant: a
+/// key value may be read here and moved to another file on disk, but it must never be
+/// returned across a command boundary. The only caller is `providers::adopt`, which
+/// copies a detected key into `providers.json`.
+pub(crate) fn credential_pairs() -> Vec<(String, String)> {
+    let Ok(path) = credentials_path() else {
+        return vec![];
+    };
+    let Ok(text) = fs::read_to_string(&path) else {
+        return vec![];
+    };
+    text.lines().filter_map(split_kv).collect()
 }
 
 /// Upsert (non-empty value) or remove (empty value) a credential, preserving all
@@ -178,6 +199,67 @@ pub fn list_dsh_profiles() -> Result<Vec<DshProfile>, String> {
             name,
         })
         .collect())
+}
+
+// ---- model routes ----------------------------------------------------------
+
+/// The one provider route dsh ships wired: `@deepseek-ai/dsh-llm-deepseek` owns it
+/// and `dsh-base` mounts that adapter in every profile, so it is available even in a
+/// dsh home with no settings document at all.
+pub(crate) const NATIVE_ROUTE: &str = "deepseek-official";
+
+fn settings_path() -> Result<PathBuf, String> {
+    Ok(root()?.join("settings.yaml"))
+}
+
+/// Provider **routes** a dsh run can resolve a model on.
+///
+/// This is not the launcher's provider list and must not be confused with it — the
+/// two are different namespaces. `providers.json` holds *the launcher's* ids
+/// (`deepseek`, `free-api`, `mcapple`), which is where a key is stored and which env
+/// var it lands in. A dsh route is a name registered on `ctx.llm` inside the running
+/// harness, and only two things register one:
+///
+/// * the native DeepSeek adapter, which owns exactly [`NATIVE_ROUTE`]; and
+/// * `@deepseek-ai/dsh-llm-pi-ai`, which is mounted dormant and registers one route
+///   per key of the `llm-pi-ai: providers:` dict in `$DSH_HOME/settings.yaml` — the
+///   section dsh's own web Models page writes.
+///
+/// So this reads that dict. A route dsh does not have makes
+/// `agent-default-model` unresolvable, which is what the user sees as 模型不可用 —
+/// hence [`crate::runtime::model`] refuses to write one rather than letting the
+/// failure happen inside the agent.
+pub(crate) fn model_routes() -> Vec<String> {
+    let mut out = vec![NATIVE_ROUTE.to_string()];
+    let Ok(path) = settings_path() else {
+        return out;
+    };
+    let Ok(text) = fs::read_to_string(&path) else {
+        return out; // no settings document ⇒ the native route is all there is
+    };
+    let Ok(docs) = yaml_rust2::YamlLoader::load_from_str(&text) else {
+        return out;
+    };
+    for doc in &docs {
+        if let Some(map) = doc["llm-pi-ai"]["providers"].as_hash() {
+            for (k, _) in map {
+                if let Some(route) = k.as_str() {
+                    let route = route.trim();
+                    if !route.is_empty() && !out.iter().any(|r| r == route) {
+                        out.push(route.to_string());
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The routes above, for the UI: an instance's dsh 服务商 field is a route name, so
+/// the editor can offer the real set instead of a text box that accepts anything.
+#[tauri::command]
+pub fn list_dsh_model_routes() -> Result<Vec<String>, String> {
+    Ok(model_routes())
 }
 
 fn profile_dir(profile: &str) -> Result<PathBuf, String> {

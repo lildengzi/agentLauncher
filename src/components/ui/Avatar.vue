@@ -4,12 +4,18 @@
 //
 // Priority:
 //   1. `image` (a real PNG/SVG URL) — drawn as-is.
-//   2. `brand` (an official simple-icons mark) — the vector logo in its own color.
-//   3. otherwise — a Lucide glyph, hue-derived from `seed` so instances stay
+//   2. a brand the *user chose* — `icon` of the form `brand:deepseek`.
+//   3. `brand` (a mark inferred from the model) — the vector logo in its own color.
+//   4. otherwise — a Lucide glyph, hue-derived from `seed` so instances stay
 //      distinguishable at a glance.
+//
+// 2 sits above 3 on purpose: a mark picked in 选择图标 is a decision, and a mark
+// derived from the model id is a guess. The guess must not overrule the decision when
+// the two disagree — which they will, the moment somebody points an OpenAI-compatible
+// gateway at a Qwen model.
 import { computed } from "vue";
 import AppIcon from "@/components/ui/AppIcon.vue";
-import type { Brand } from "@/lib/brand";
+import { brandForIcon, type Brand } from "@/lib/brand";
 
 const props = withDefaults(
   defineProps<{
@@ -50,6 +56,9 @@ const imageStyle = computed(() => ({
 
 const artPx = computed(() => Math.round(props.size * 0.86));
 const iconColor = computed(() => `hsl(${seedHue.value} 55% 68%)`);
+
+/** The chosen mark, else the inferred one. */
+const mark = computed<Brand | null>(() => brandForIcon(props.icon) ?? props.brand);
 </script>
 
 <template>
@@ -58,14 +67,14 @@ const iconColor = computed(() => `hsl(${seedHue.value} 55% 68%)`);
     <span v-if="image" :style="imageStyle" />
     <!-- official brand logo, in its own color -->
     <svg
-      v-else-if="brand"
+      v-else-if="mark"
       :width="artPx"
       :height="artPx"
       viewBox="0 0 24 24"
       role="img"
-      :aria-label="brand.title"
+      :aria-label="mark.title"
     >
-      <path :d="brand.path" :fill="`#${brand.hex}`" />
+      <path :d="mark.path" :fill="`#${mark.hex}`" />
     </svg>
     <!-- generated identity glyph -->
     <AppIcon

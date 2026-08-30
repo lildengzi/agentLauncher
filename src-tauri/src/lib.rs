@@ -1,5 +1,6 @@
 mod engines;
 mod executor;
+mod instance_env;
 mod instance_ext;
 mod instance_manager;
 mod launcher_config;
@@ -11,7 +12,7 @@ mod test_support;
 
 use executor::RunnerState;
 use instance_manager::{Instance, NewInstance};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 // ---- instance CRUD --------------------------------------------------------
@@ -79,6 +80,25 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Bring the main window forward with one settings page open.
+///
+/// The key store is app-level: one `providers.json`, shared by every instance, and
+/// exactly one editor for it — the 设置 → 模型与 API page in the main window. An
+/// instance editor therefore *links* to it instead of embedding a second copy: two
+/// windows saving the same credential file would be last-writer-wins over secrets.
+///
+/// The page name is passed through as an opaque string; the frontend decides whether
+/// it names a section it has, so a page renamed there cannot break a launch here.
+#[tauri::command]
+fn open_settings(app: AppHandle, page: String) -> Result<(), String> {
+    let win = app
+        .get_webview_window("main")
+        .ok_or_else(|| "主窗口不存在".to_string())?;
+    win.unminimize().ok(); // a minimized window would "focus" invisibly
+    win.set_focus().map_err(|e| e.to_string())?;
+    win.emit("open-settings", page).map_err(|e| e.to_string())
+}
+
 /// Open — or focus — the standalone editor window for one instance.
 ///
 /// One window per instance, keyed by the label `edit-<id>`. The label *is* the
@@ -127,6 +147,7 @@ pub fn run() {
             open_instance_folder,
             open_url,
             open_edit_window,
+            open_settings,
             engines::detect_engines,
             instance_ext::read_instance_extensions,
             instance_ext::read_instance_agents,
@@ -134,6 +155,8 @@ pub fn run() {
             instance_ext::set_instance_mcp,
             instance_ext::remove_instance_skill,
             instance_ext::open_instance_subdir,
+            instance_env::get_instance_key,
+            instance_env::set_instance_key,
             market::market_fetch,
             market::market_refresh,
             market::market_readme,
@@ -146,9 +169,12 @@ pub fn run() {
             providers::set_provider_key,
             providers::detect::detect_local_llms,
             providers::detect::fetch_provider_models,
+            providers::adopt::detect_agent_providers,
+            providers::adopt::import_agent_provider_keys,
             runtime::dsh_home::list_credential_keys,
             runtime::dsh_home::set_credential,
             runtime::dsh_home::list_dsh_profiles,
+            runtime::dsh_home::list_dsh_model_routes,
             runtime::dsh_home::list_installed_plugins,
             runtime::dsh_home::plugin_add,
             runtime::dsh_home::plugin_remove,

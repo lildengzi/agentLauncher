@@ -109,11 +109,7 @@ pub async fn get_capped(url: &reqwest::Url, cap: usize) -> Result<Vec<u8>, Strin
     let read = async {
         let mut res = res;
         let mut buf: Vec<u8> = Vec::new();
-        while let Some(chunk) = res
-            .chunk()
-            .await
-            .map_err(|e| format!("read failed: {e}"))?
-        {
+        while let Some(chunk) = res.chunk().await.map_err(|e| format!("read failed: {e}"))? {
             if buf.len() + chunk.len() > cap {
                 return Err(format!("response exceeded {cap} bytes"));
             }

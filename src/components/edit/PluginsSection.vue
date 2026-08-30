@@ -4,7 +4,8 @@
 // Shared contract for all three extension sections, because
 // EditInstanceDialog.vue does the one `api.readInstanceExtensions` call and
 // passes the result down:
-//   :instance-id  — "" while creating an unsaved instance ⇒ show `ext.saveFirst`
+//   :instance-id  — the instance whose directory this section edits; always set,
+//                   since 新建实例 is its own dialog and never mounts this one
 //   :extensions   — the whole InstanceExtensions, or null while loading/failed
 //   :loading      — a read is in flight
 //   @changed      — this section wrote something; parent re-reads

@@ -162,8 +162,12 @@ mod tests {
         )
         .unwrap();
 
-        let got = read("team", "https://example.invalid/items.json", "agentlauncher")
-            .expect("cache present");
+        let got = read(
+            "team",
+            "https://example.invalid/items.json",
+            "agentlauncher",
+        )
+        .expect("cache present");
         assert_eq!(got.format_version, 1);
         assert_eq!(got.fetched_at, "2026-01-01T00:00:00Z");
         assert_eq!(got.items.len(), 2);
@@ -177,8 +181,14 @@ mod tests {
         let tree = temp_tree("market-cache-repoint");
         let _home = EnvGuard::set("HOME", tree.path());
 
-        write("team", "https://old.invalid/x.json", "agentlauncher", "t", &[item("team:a")])
-            .unwrap();
+        write(
+            "team",
+            "https://old.invalid/x.json",
+            "agentlauncher",
+            "t",
+            &[item("team:a")],
+        )
+        .unwrap();
         assert!(read("team", "https://new.invalid/x.json", "agentlauncher").is_none());
         assert!(read("team", "https://old.invalid/x.json", "dsh-market").is_none());
         assert!(read("other", "https://old.invalid/x.json", "agentlauncher").is_none());

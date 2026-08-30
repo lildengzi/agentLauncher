@@ -27,3 +27,9 @@ chrono = { version = "0.4", features = ["serde"] }
 # release to whatever libssl each distro ships. `gzip` is not cosmetic: the one feed
 # we ship is 11.6 MB of JSON served with `Vary: Accept-Encoding`.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+# Reading the *other* agents' own config files, so a provider the user already set up
+# once does not have to be typed again (see providers::adopt). Both parsers are used
+# for exactly that and nothing else: omp keeps its providers in YAML, codex in TOML.
+# `toml` is already in the lock via tauri-build, so this line downloads nothing new.
+yaml-rust2 = "0.12"
+toml = "0.9"

@@ -12,6 +12,11 @@ export interface RuntimeConfig {
   engine: string;
   /** "autodetect" (enrich PATH from the login shell) | "isolated" (minimal PATH). */
   env_policy: string;
+  /** How a run is hosted: "interactive" — the engine's own session, in a terminal
+   *  window the launcher opens; "task" — one task in, output to the console.
+   *  Empty means "ask the engine" (a session for the five CLI agents; for dsh the
+   *  profile decides), which is also what older instance.json files say. */
+  mode: string;
   /** absolute path to the agent CLI; overrides PATH lookup when non-empty. */
   custom_bin: string;
 }
@@ -266,6 +271,15 @@ export interface ProviderKeyView {
 
 /** One provider row. Every field but `id` may be empty — empty means "omit", never
  *  "guess", the same contract the engine adapters follow for provider/model flags. */
+/** 这个实例自己 `.env` 里那把密钥的样子（值永远不过来，只有名字和指纹）。 */
+export interface InstanceKeyView {
+  /** 装着密钥的环境变量名；空＝这个实例没有自己的密钥。 */
+  var: string;
+  /** `sk-a…9f2a`，或者值太短时的一串点。 */
+  fingerprint: string;
+  has_value: boolean;
+}
+
 export interface ProviderView {
   id: string;
   label: string;
@@ -291,6 +305,27 @@ export interface LocalLlm {
   /** OpenAI-compatible root, ready to paste into a provider row. */
   base_url: string;
   models: string[];
+}
+
+/** A provider one of the *other* installed agents already knows about.
+ *
+ *  Read out of that agent's own config file (omp's `models.yml`, codex's
+ *  `config.toml`, …) so a provider configured once elsewhere does not have to be
+ *  typed again. Detection follows the same rule as engines: only agents actually on
+ *  PATH are consulted, and nothing is scanned.
+ *
+ *  Note what is missing: there is no key field, only `has_key`. A detected key is
+ *  copied disk-to-disk by `importAgentProviderKeys`; it never travels through here. */
+export interface DetectedProvider {
+  id: string;
+  label: string;
+  base_url: string;
+  api_key_env: string;
+  models: string[];
+  /** One of the sources holds a usable-looking key, importable on request. */
+  has_key: boolean;
+  /** Engine ids this was found in, e.g. `["omp", "opencode"]`. */
+  sources: string[];
 }
 
 /** How an item is actually installed. `method` is a string, not a union, so an

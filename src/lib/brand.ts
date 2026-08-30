@@ -125,3 +125,84 @@ export function brandForProvider(provider: string | null | undefined): Brand | n
   if (!provider) return null;
   return PROVIDER_BRANDS[provider.toLowerCase()] ?? null;
 }
+
+// ---- the icon picker's catalogue ------------------------------------------
+// `instance.icon` used to be one thing — a lucide glyph name, typed into a text box.
+// It now also accepts `brand:<slug>`, which names one of the marks above. Old values
+// keep working untouched: anything without the prefix is still a lucide name, and an
+// unknown prefix falls through to the same Bot fallback as an unknown glyph, so a
+// hand-edited config.json can never render as nothing.
+
+/** Marks a *chosen* icon, as opposed to one merely inferred from the model. */
+export const BRAND_PREFIX = "brand:";
+
+/** "Hugging Face" → "hugging-face". Ids come from the title rather than the
+ *  `siFoo` import name so that two aliases of one mark collapse to one entry. */
+function titleId(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Every distinct mark, once each — the brand half of the icon picker's grid. */
+export const BRAND_CHOICES: { id: string; brand: Brand }[] = (() => {
+  const seen = new Set<string>();
+  const out: { id: string; brand: Brand }[] = [];
+  for (const brand of Object.values(PROVIDER_BRANDS)) {
+    const id = BRAND_PREFIX + titleId(brand.title);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, brand });
+  }
+  return out.sort((a, b) => a.brand.title.localeCompare(b.brand.title));
+})();
+
+const BRAND_BY_ICON = new Map(BRAND_CHOICES.map((c) => [c.id, c.brand]));
+
+/** The icon id for a mark, so a *derived* brand can be written down as a chosen one. */
+export function iconIdForBrand(brand: Brand): string {
+  return BRAND_PREFIX + titleId(brand.title);
+}
+
+/** The mark an `instance.icon` names, or null when it names a lucide glyph. */
+export function brandForIcon(icon: string | null | undefined): Brand | null {
+  if (!icon || !icon.startsWith(BRAND_PREFIX)) return null;
+  return BRAND_BY_ICON.get(icon) ?? null;
+}
+
+/** What each engine looks like when nothing more specific is known.
+ *
+ *  `pi` and `omp` get a neutral lucide glyph rather than a mark, because neither
+ *  project has one in simple-icons and hand-drawing brand art is not an option (see
+ *  the note at the top of this file) — a wrong logo is worse than a plain glyph. */
+const ENGINE_ICONS: Record<string, string> = {
+  // dsh *is* the DeepSeek Harness, hence DeepSeek's mark rather than a generic one.
+  dsh: iconIdForBrand(b(siDeepseek)),
+  claude: iconIdForBrand(b(siClaudecode)),
+  codex: iconIdForBrand(siOpenai),
+  opencode: iconIdForBrand(b(siOpencode)),
+  pi: "pi",
+  omp: "blocks",
+};
+
+/**
+ * The icon a new instance should start from, given what it is actually made of.
+ *
+ * The old default was the literal string `"bot"` — a grey robot on every tile, which
+ * told the user nothing and looked like a placeholder because it was one. An instance
+ * that runs DeepSeek should arrive wearing DeepSeek's mark; the picker is then for
+ * *changing* that, not for rescuing it.
+ *
+ * Order is most-specific-first: the model names the vendor, the provider names it less
+ * precisely, and the engine is the last thing that can say anything at all.
+ */
+export function defaultIcon(opts: {
+  engine?: string | null;
+  provider?: string | null;
+  model?: string | null;
+}): string {
+  const found = brandForModel(opts.model) ?? brandForProvider(opts.provider);
+  if (found) return iconIdForBrand(found);
+  return ENGINE_ICONS[(opts.engine ?? "").toLowerCase()] ?? "bot";
+}

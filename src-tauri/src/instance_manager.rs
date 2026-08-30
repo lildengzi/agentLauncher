@@ -19,6 +19,17 @@ pub struct RuntimeConfig {
     /// toolchain. Kept as a String (like `profile`) and validated at use.
     #[serde(default = "default_env_policy")]
     pub env_policy: String,
+    /// How a run is hosted: "interactive" — the engine's own session, in a
+    /// terminal window the launcher opens; "task" — one task in, output captured
+    /// to the launcher's console.
+    ///
+    /// **Empty means "ask the engine"**, and empty is what every `instance.json`
+    /// written before this field existed says. That is deliberate: reinterpreting
+    /// those files would silently change how they launch, while asking the engine
+    /// gives each its own honest default (a session for the five CLI agents, and
+    /// for dsh the profile keeps deciding). See `runtime::RunMode::resolve`.
+    #[serde(default)]
+    pub mode: String,
     /// Absolute path to this instance's agent CLI; when non-empty it overrides
     /// the PATH lookup for the binary and its directory is added to PATH.
     #[serde(default)]
@@ -35,6 +46,7 @@ impl Default for RuntimeConfig {
         Self {
             engine: default_engine(),
             env_policy: default_env_policy(),
+            mode: String::new(),
             custom_bin: String::new(),
         }
     }

@@ -91,7 +91,11 @@ pub struct EngineInfo {
 }
 
 /// Find `bin` on a colon/semicolon-separated PATH, returning the first match.
-fn find_on_path(bin: &str, path_var: &str) -> Option<String> {
+///
+/// `pub(crate)` because terminal discovery ([`crate::runtime::term`]) must follow
+/// exactly this rule — PATH lookup, no disk scan, never executing the candidate.
+/// One implementation, so the two can't drift apart.
+pub(crate) fn find_on_path(bin: &str, path_var: &str) -> Option<String> {
     let sep = if cfg!(windows) { ';' } else { ':' };
     for dir in path_var.split(sep) {
         if dir.is_empty() {

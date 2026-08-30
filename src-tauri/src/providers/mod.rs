@@ -21,7 +21,10 @@
 //!
 //! Related: [`detect`] lists models — local runtimes by port probe, cloud
 //! providers by an explicit, user-triggered call to the provider's own API.
+//! [`adopt`] reads the *other* installed agents' own config files, so a provider the
+//! user set up once elsewhere does not have to be typed again.
 
+pub mod adopt;
 pub mod detect;
 pub mod dispatch;
 
@@ -294,7 +297,9 @@ fn set_mode(path: &Path, mode: u32) -> Result<(), String> {
 /// write would give it. The root is tightened too: it already holds every
 /// instance's `.env`, which is where the other engines' keys live.
 fn write_secret_json(path: &Path, doc: &ProvidersDoc) -> Result<(), String> {
-    let root = path.parent().ok_or("providers.json has no parent directory")?;
+    let root = path
+        .parent()
+        .ok_or("providers.json has no parent directory")?;
     fs::create_dir_all(root).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     let _ = set_mode(root, 0o700);
@@ -570,7 +575,10 @@ mod tests {
         assert_eq!(a.api_key_env, "ANTHROPIC_API_KEY");
         assert_eq!(a.auth_style, "x-api-key");
         // No base URL is injected by default, so this round cannot re-point a launch.
-        assert!(doc.providers.iter().all(|p| p.base_url_env.is_empty() || p.base_url.is_empty()));
+        assert!(doc
+            .providers
+            .iter()
+            .all(|p| p.base_url_env.is_empty() || p.base_url.is_empty()));
         // No model list ships with a builtin: a hardcoded one goes stale silently and
         // then fails at the provider. `fetch_provider_models` is the source of truth,
         // which is why every builtin that has a real API root carries it.
@@ -624,7 +632,11 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
             assert_eq!(mode, 0o600, "providers.json must not be readable by others");
-            let dir = fs::metadata(path.parent().unwrap()).unwrap().permissions().mode() & 0o777;
+            let dir = fs::metadata(path.parent().unwrap())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
             assert_eq!(dir, 0o700);
         }
     }
@@ -689,9 +701,21 @@ mod tests {
             enabled: true,
             builtin: true,
             keys: vec![
-                ProviderKeyView { alias: "a".into(), enabled: true, ..Default::default() },
-                ProviderKeyView { alias: " ".into(), enabled: true, ..Default::default() },
-                ProviderKeyView { alias: "a".into(), enabled: false, ..Default::default() },
+                ProviderKeyView {
+                    alias: "a".into(),
+                    enabled: true,
+                    ..Default::default()
+                },
+                ProviderKeyView {
+                    alias: " ".into(),
+                    enabled: true,
+                    ..Default::default()
+                },
+                ProviderKeyView {
+                    alias: "a".into(),
+                    enabled: false,
+                    ..Default::default()
+                },
             ],
         }])
         .unwrap();
@@ -699,10 +723,17 @@ mod tests {
         let doc = load().unwrap();
         let mine = doc.providers.iter().find(|p| p.id == "local-vllm").unwrap();
         assert!(!mine.builtin, "a user row cannot claim to be builtin");
-        assert_eq!(mine.label, "local-vllm", "a blank label falls back to the id");
+        assert_eq!(
+            mine.label, "local-vllm",
+            "a blank label falls back to the id"
+        );
         assert_eq!(mine.auth_style, "", "empty means auto-detect, not bearer");
         assert_eq!(mine.models, vec!["qwen3"]);
-        assert_eq!(mine.keys.len(), 1, "blank and duplicate aliases are dropped");
+        assert_eq!(
+            mine.keys.len(),
+            1,
+            "blank and duplicate aliases are dropped"
+        );
         // Restored, and not silently re-enabled.
         let ds = doc.providers.iter().find(|p| p.id == "deepseek").unwrap();
         assert!(ds.builtin && !ds.enabled);
@@ -763,7 +794,10 @@ mod tests {
         set_key("openai", "work", "").unwrap();
         let doc = load().unwrap();
         let p = doc.providers.iter().find(|p| p.id == "openai").unwrap();
-        assert!(p.keys.is_empty(), "clearing a key deletes it, secret and all");
+        assert!(
+            p.keys.is_empty(),
+            "clearing a key deletes it, secret and all"
+        );
 
         assert!(set_key("nope", "work", "sk-1").is_err());
         assert!(set_key("openai", "  ", "sk-1").is_err());

@@ -209,8 +209,14 @@ mod tests {
         let doc = load().unwrap();
         assert_eq!(doc.format_version, 1);
         assert!(doc.sources.iter().all(|s| s.builtin));
-        assert!(doc.sources.iter().all(|s| s.enabled), "every shipped row is verified");
-        assert!(doc.sources.iter().any(|s| s.id == "dsh-market" && s.enabled));
+        assert!(
+            doc.sources.iter().all(|s| s.enabled),
+            "every shipped row is verified"
+        );
+        assert!(doc
+            .sources
+            .iter()
+            .any(|s| s.id == "dsh-market" && s.enabled));
         // Only sources declaring a kind answer that dialog.
         let mcp: Vec<&str> = doc
             .sources

@@ -389,7 +389,10 @@ async fn load_source(src: &SourceDef, force: bool) -> (Arc<Vec<MarketItem>>, Sou
     let cached = if force { None } else { snapshot(src) };
     if let Some(snap) = &cached {
         if is_fresh(&snap.fetched_at) {
-            return (snap.items.clone(), ok_status(src, snap, false, String::new()));
+            return (
+                snap.items.clone(),
+                ok_status(src, snap, false, String::new()),
+            );
         }
     }
     match fetch_source(src).await {
@@ -785,7 +788,10 @@ mod tests {
         let st = &page.statuses[0];
         assert!(!st.ok && st.stale);
         assert_eq!(st.item_count, 1);
-        assert_eq!(st.fetched_at, "2020-01-01T00:00:00Z", "the copy's own stamp");
+        assert_eq!(
+            st.fetched_at, "2020-01-01T00:00:00Z",
+            "the copy's own stamp"
+        );
         assert!(!st.error.is_empty(), "and why it could not be refreshed");
     }
 
@@ -821,9 +827,15 @@ mod tests {
 
         let page = block_on(market_fetch(plugin_query("", "name", 0, 0))).unwrap();
         assert!(page.statuses[0].ok, "{:?}", page.statuses[0].error);
-        assert_eq!(page.total, 3, "the broken file costs itself, not the source");
         assert_eq!(
-            page.items.iter().map(|i| i.name.as_str()).collect::<Vec<_>>(),
+            page.total, 3,
+            "the broken file costs itself, not the source"
+        );
+        assert_eq!(
+            page.items
+                .iter()
+                .map(|i| i.name.as_str())
+                .collect::<Vec<_>>(),
             vec!["Postgres Inspector", "Solo", "Web Fetch"]
         );
         assert_eq!(page.items[0].id, "drop-in:pg", "ids are source-qualified");
@@ -895,7 +907,11 @@ mod tests {
         let _home = EnvGuard::set("HOME", tree.path());
         let dir = tree.path().join("drop-in");
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("a.json"), r#"{"id":"a","name":"A","kind":"plugin"}"#).unwrap();
+        std::fs::write(
+            dir.join("a.json"),
+            r#"{"id":"a","name":"A","kind":"plugin"}"#,
+        )
+        .unwrap();
 
         let mut src = row("weird", "dir", &dir.to_string_lossy());
         src.adapter = "some-future-shape".into();
@@ -937,8 +953,14 @@ mod tests {
             "# Alpha\n\nprose",
             "an inline readme is served without a request"
         );
-        assert_eq!(block_on(market_readme("no-such-source:x".into())).unwrap(), "");
-        assert_eq!(block_on(market_readme("team-readme:missing".into())).unwrap(), "");
+        assert_eq!(
+            block_on(market_readme("no-such-source:x".into())).unwrap(),
+            ""
+        );
+        assert_eq!(
+            block_on(market_readme("team-readme:missing".into())).unwrap(),
+            ""
+        );
         assert_eq!(block_on(market_readme("unqualified".into())).unwrap(), "");
     }
 }

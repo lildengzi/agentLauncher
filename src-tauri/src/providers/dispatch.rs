@@ -13,13 +13,18 @@
 //!   at all, and successive launches walk that provider's enabled keys in turn.
 //!
 //! The two failure modes are deliberately different. An **explicit** binding that
-//! cannot be honoured fails the launch loudly: the user asked for a specific key,
-//! and quietly running on a different one is a billing and quota decision that is
-//! not ours to make. The **implicit** fallback — matching `instance.provider`
-//! against a provider id, for the common case where the two happen to coincide —
-//! never fails a launch: it injects nothing and the engine falls back to whatever
-//! it already had, which is exactly how every instance behaved before this file
-//! existed.
+//! cannot be honoured is an error: the user asked for a specific key, and quietly
+//! running on a different one is a billing and quota decision that is not ours to
+//! make. The **implicit** fallback — matching `instance.provider` against a provider
+//! id, for the common case where the two happen to coincide — never fails: it
+//! injects nothing and the engine falls back to whatever it already had, which is
+//! exactly how every instance behaved before this file existed.
+//!
+//! Whether an error here *stops* a launch is not decided here. This module is one
+//! tier of three, and only the caller can see the others — see
+//! `executor::resolve_credentials`: an instance carrying its own key in its
+//! `.env` never reaches this code at all, and for dsh, which has a credential store
+//! of its own, an unusable binding is reported and the run continues on that store.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -166,7 +171,10 @@ mod tests {
     fn parsing_a_reference() {
         assert_eq!(parse_ref(""), (String::new(), String::new()));
         assert_eq!(parse_ref(" deepseek "), ("deepseek".into(), String::new()));
-        assert_eq!(parse_ref("deepseek/team"), ("deepseek".into(), "team".into()));
+        assert_eq!(
+            parse_ref("deepseek/team"),
+            ("deepseek".into(), "team".into())
+        );
     }
 
     #[test]
@@ -232,7 +240,11 @@ mod tests {
         let mut view = get_providers().unwrap();
         {
             let p = view.iter_mut().find(|p| p.id == "openai").unwrap();
-            p.keys.iter_mut().find(|k| k.alias == "team").unwrap().enabled = false;
+            p.keys
+                .iter_mut()
+                .find(|k| k.alias == "team")
+                .unwrap()
+                .enabled = false;
         }
         set_providers(view).unwrap();
         assert!(
@@ -261,7 +273,10 @@ mod tests {
         // Once the names do coincide, the convenience match works with no extra setup.
         set_key("deepseek", "only", "sk-onlyonlyonlyonly").unwrap();
         let env = env_for_instance(&inst("deepseek", "")).unwrap();
-        assert_eq!(env[0], ("DEEPSEEK_API_KEY".into(), "sk-onlyonlyonlyonly".into()));
+        assert_eq!(
+            env[0],
+            ("DEEPSEEK_API_KEY".into(), "sk-onlyonlyonlyonly".into())
+        );
     }
 
     #[test]
@@ -277,7 +292,10 @@ mod tests {
 
         let mut view = get_providers().unwrap();
         {
-            let p = view.iter_mut().find(|p| p.id == "openai-compatible").unwrap();
+            let p = view
+                .iter_mut()
+                .find(|p| p.id == "openai-compatible")
+                .unwrap();
             p.base_url = "http://127.0.0.1:8000/v1".into();
         }
         set_providers(view).unwrap();

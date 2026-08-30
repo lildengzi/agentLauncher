@@ -229,7 +229,7 @@ fn read_skills(id: &str) -> Result<Vec<SkillEntry>, String> {
         })
         .filter(|s| !s.name.starts_with('.'))
         .collect();
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|s| s.name.to_lowercase());
     Ok(out)
 }
 
@@ -304,8 +304,8 @@ pub fn read_instance_extensions(
             .filter(|p| !p.is_empty())
             .or_else(|| Some(inst.profile.clone()).filter(|p| !p.is_empty()))
             .unwrap_or_else(|| "headless".to_string());
-        let found = crate::runtime::dsh_home::list_installed_plugins(profile.clone())
-            .unwrap_or_default();
+        let found =
+            crate::runtime::dsh_home::list_installed_plugins(profile.clone()).unwrap_or_default();
         (found, format!("dsh-profile:{profile}"))
     } else {
         (vec![], "unsupported".to_string())
@@ -336,7 +336,9 @@ pub fn remove_instance_skill(id: String, name: String) -> Result<(), String> {
     if name.is_empty() || name.contains('/') || name.contains('\\') || name.contains("..") {
         return Err(format!("invalid skill name: {name}"));
     }
-    let dir = instance_manager::instance_dir(&id)?.join("skills").join(&name);
+    let dir = instance_manager::instance_dir(&id)?
+        .join("skills")
+        .join(&name);
     if !dir.is_dir() {
         return Err(format!("no such skill: {name}"));
     }
@@ -396,7 +398,10 @@ mod tests {
         let entry = McpServerEntry {
             name: "fs".into(),
             command: "npx".into(),
-            args: vec!["-y".into(), "@modelcontextprotocol/server-filesystem".into()],
+            args: vec![
+                "-y".into(),
+                "@modelcontextprotocol/server-filesystem".into(),
+            ],
             env: BTreeMap::from([("ROOT".to_string(), "/tmp".to_string())]),
             disabled: true,
         };
@@ -406,7 +411,10 @@ mod tests {
         // The write normalises the key: standard in, legacy alias gone.
         let text = fs::read_to_string(mcp_path(&id).unwrap()).unwrap();
         assert!(text.contains("mcpServers"), "should write the standard key");
-        assert!(!text.contains("\"servers\""), "legacy key should be dropped");
+        assert!(
+            !text.contains("\"servers\""),
+            "legacy key should be dropped"
+        );
     }
 
     #[test]
@@ -477,7 +485,10 @@ mod tests {
         // An instance from an older build has none: absent, not an error.
         fs::remove_file(&path).unwrap();
         let missing = read_instance_agents(id.clone()).unwrap();
-        assert!(!missing.exists, "a missing AGENTS.md must report exists=false");
+        assert!(
+            !missing.exists,
+            "a missing AGENTS.md must report exists=false"
+        );
         assert_eq!(missing.text, "");
 
         // Written verbatim — trailing whitespace and all, so a reload matches what

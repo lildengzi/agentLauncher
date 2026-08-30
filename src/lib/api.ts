@@ -2,12 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AgentsDoc,
+  DetectedProvider,
   DshProfile,
   EngineInfo,
   InstGroups,
   Instance,
   InstallSpec,
   InstanceExtensions,
+  InstanceKeyView,
   LauncherConfig,
   LocalLlm,
   MarketPage,
@@ -50,6 +52,13 @@ export const api = {
    */
   openEditWindow: (id: string) => invoke<void>("open_edit_window", { id }),
 
+  /**
+   * Bring the main window forward with one settings page open — the route an
+   * instance editor uses to reach the app-level key store, which has exactly one
+   * editor on purpose (see `open_settings` in lib.rs).
+   */
+  openSettings: (page: string) => invoke<void>("open_settings", { page }),
+
   /** Live-probe which known agent engines (CLIs) are installed on the host. */
   detectEngines: () => invoke<EngineInfo[]>("detect_engines"),
 
@@ -84,6 +93,17 @@ export const api = {
   /** Reveal one of an instance's own subdirectories ("skills"|"workspace"|"logs"). */
   openInstanceSubdir: (id: string, sub: string) =>
     invoke<void>("open_instance_subdir", { id, sub }),
+  /**
+   * Whether this instance keeps a key of its own in `instances/<id>/.env`, and which
+   * variable holds it. Masked: a fingerprint comes back, never the value.
+   */
+  getInstanceKey: (id: string) => invoke<InstanceKeyView>("get_instance_key", { id }),
+  /**
+   * Write (or, with an empty value, remove) one variable in this instance's `.env`.
+   * The launcher layers that file last, so a key here wins over the shared store.
+   */
+  setInstanceKey: (id: string, varName: string, value: string) =>
+    invoke<void>("set_instance_key", { id, var: varName, value }),
 
   // ---- decentralized market ----------------------------------------------
   /** Query every enabled source that serves `query.kind`, merged and sorted. */
@@ -127,6 +147,19 @@ export const api = {
    */
   fetchProviderModels: (provider: string, alias = "") =>
     invoke<string[]>("fetch_provider_models", { provider, alias }),
+  /**
+   * Providers the machine's *other* agents already have configured, read from their
+   * own config files. Only agents on PATH are consulted; no disk scan, no network.
+   * Returns `has_key`, never a key.
+   */
+  detectAgentProviders: () => invoke<DetectedProvider[]>("detect_agent_providers"),
+  /**
+   * Copy each named provider's detected key into `providers.json`. The value moves
+   * disk-to-disk inside the backend — it is not sent from here and is not returned.
+   * The provider row must already be saved. Resolves to how many keys landed.
+   */
+  importAgentProviderKeys: (providers: string[]) =>
+    invoke<number>("import_agent_provider_keys", { providers }),
 
   // ---- real dsh config wiring --------------------------------------------
   /** Names (not values) of credentials stored in ~/.dsh/.credentials.yaml. */
@@ -136,6 +169,13 @@ export const api = {
     invoke<void>("set_credential", { key, value }),
   /** Profiles under ~/.dsh/profiles, each with its web capability resolved. */
   listDshProfiles: () => invoke<DshProfile[]>("list_dsh_profiles"),
+  /**
+   * Provider **routes** a dsh run can resolve a model on — dsh's own namespace, not
+   * the launcher's provider ids. Always contains `deepseek-official` (the native
+   * adapter's route); anything else was registered by `llm-pi-ai: providers:` in
+   * `$DSH_HOME/settings.yaml`, which is what dsh's web Models page writes.
+   */
+  listDshModelRoutes: () => invoke<string[]>("list_dsh_model_routes"),
   /** npm package names installed in a profile (its package.json dependencies). */
   listInstalledPlugins: (profile: string) =>
     invoke<string[]>("list_installed_plugins", { profile }),
@@ -173,4 +213,11 @@ export function onRuntimeStatus(
   cb: (e: RuntimeStatusEvent) => void
 ): Promise<UnlistenFn> {
   return listen<RuntimeStatusEvent>("runtime-status", (evt) => cb(evt.payload));
+}
+
+/** An editor window asked the main window to show one settings page (see
+ *  `api.openSettings`). The payload is the page name; the main window is the only
+ *  listener, because it is the only window that owns the settings surface. */
+export function onOpenSettings(cb: (page: string) => void): Promise<UnlistenFn> {
+  return listen<string>("open-settings", (evt) => cb(evt.payload));
 }

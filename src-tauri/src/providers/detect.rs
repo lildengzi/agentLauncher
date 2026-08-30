@@ -213,7 +213,11 @@ pub async fn fetch_provider_models(provider: String, alias: String) -> Result<Ve
             }
             k
         };
-        (models_url(&p.base_url)?, p.auth_style.clone(), chosen.value.clone())
+        (
+            models_url(&p.base_url)?,
+            p.auth_style.clone(),
+            chosen.value.clone(),
+        )
     };
 
     let client = reqwest::Client::builder()
@@ -262,8 +266,8 @@ pub async fn fetch_provider_models(provider: String, alias: String) -> Result<Ve
         let body = resp.text().await.unwrap_or_default();
         let snippet: String = body.trim().chars().take(200).collect();
         last = format!("{status}: {snippet}");
-        let wrong_shape = status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN;
+        let wrong_shape =
+            status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN;
         if !wrong_shape || i + 1 == styles.len() {
             return Err(last);
         }
@@ -292,7 +296,9 @@ mod tests {
         );
         // A gateway on its own version scheme is not given a second one.
         assert_eq!(
-            models_url("https://gw.example.com/api/v3").unwrap().as_str(),
+            models_url("https://gw.example.com/api/v3")
+                .unwrap()
+                .as_str(),
             "https://gw.example.com/api/v3/models"
         );
     }

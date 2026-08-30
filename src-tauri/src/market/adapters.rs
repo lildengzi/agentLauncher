@@ -467,7 +467,10 @@ fn mcp_install(s: &Value, native: &str) -> InstallSpec {
         }
         // An `mcpServers` entry is a child process the engine talks to over pipes, so
         // a package announcing any other transport is not one of these.
-        let transport = pkg.get("transport").map(|t| text(t, "type")).unwrap_or_default();
+        let transport = pkg
+            .get("transport")
+            .map(|t| text(t, "type"))
+            .unwrap_or_default();
         if !transport.is_empty() && transport != "stdio" {
             continue;
         }
@@ -564,8 +567,14 @@ mod tests {
         let plugin = &items[0];
         assert_eq!(plugin.id, "dsh-market:owner/dsh-thing");
         assert_eq!(plugin.kind, "plugin");
-        assert_eq!(plugin.description, "一个东西。", "zh wins for the default locale");
-        assert_eq!(plugin.license, "", "a null licence costs the field, not the feed");
+        assert_eq!(
+            plugin.description, "一个东西。",
+            "zh wins for the default locale"
+        );
+        assert_eq!(
+            plugin.license, "",
+            "a null licence costs the field, not the feed"
+        );
         assert_eq!(plugin.tags, vec!["dsh-plugin".to_string()]);
         assert_eq!(plugin.downloads, 11);
         assert_eq!(plugin.repo, "https://github.com/owner/dsh-thing");
@@ -617,10 +626,14 @@ mod tests {
         assert!(err.contains("unknown payload adapter"), "{err}");
         // Junk in the canonical shape yields no items rather than an error: a
         // drop-in directory with one bad file should still serve its good ones.
-        assert!(normalise("agentlauncher", "local", &json!(42)).unwrap().is_empty());
-        assert!(normalise("agentlauncher", "local", &json!({"items": [{}, 7]}))
+        assert!(normalise("agentlauncher", "local", &json!(42))
             .unwrap()
             .is_empty());
+        assert!(
+            normalise("agentlauncher", "local", &json!({"items": [{}, 7]}))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     /// The hand-written shapes a drop-in directory actually contains.
@@ -637,8 +650,14 @@ mod tests {
         let items = normalise("agentlauncher", "local", &one).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].id, "local:pg");
-        assert_eq!(items[0].kind, "mcp", "kind inferred from the install method");
-        assert_eq!(items[0].versions[0].install.mcp.as_ref().unwrap().name, "postgres");
+        assert_eq!(
+            items[0].kind, "mcp",
+            "kind inferred from the install method"
+        );
+        assert_eq!(
+            items[0].versions[0].install.mcp.as_ref().unwrap().name,
+            "postgres"
+        );
 
         // A bare array, and an item with nothing installable at all.
         let many = json!([
@@ -704,7 +723,11 @@ mod tests {
         assert_eq!(pretrip.author, "agency.kesey");
         assert_eq!(pretrip.updated_at, "2026-05-01T00:00:00Z");
         assert_eq!(
-            pretrip.versions.iter().map(|v| v.version.as_str()).collect::<Vec<_>>(),
+            pretrip
+                .versions
+                .iter()
+                .map(|v| v.version.as_str())
+                .collect::<Vec<_>>(),
             vec!["1.0.1", "1.0.0"],
             "newest first"
         );
@@ -713,14 +736,27 @@ mod tests {
         let entry = install.mcp.as_ref().unwrap();
         assert_eq!(entry.name, "pretrip");
         assert_eq!(entry.command, "npx");
-        assert_eq!(entry.args, vec!["-y".to_string(), "pretrip-mcp@1.0.1".to_string()]);
-        assert!(entry.env.is_empty(), "no value for a secret ever enters mcp.json");
-        assert_eq!(install.env, vec!["PRETRIP_API_KEY".to_string()], "names only");
+        assert_eq!(
+            entry.args,
+            vec!["-y".to_string(), "pretrip-mcp@1.0.1".to_string()]
+        );
+        assert!(
+            entry.env.is_empty(),
+            "no value for a secret ever enters mcp.json"
+        );
+        assert_eq!(
+            install.env,
+            vec!["PRETRIP_API_KEY".to_string()],
+            "names only"
+        );
 
         // Remote-only: an endpoint to copy, not an invented bridge command.
         let remote = &items[1];
         assert_eq!(remote.versions[0].install.method, "manual");
-        assert_eq!(remote.versions[0].install.command, "https://api.inference.sh/mcp");
+        assert_eq!(
+            remote.versions[0].install.command,
+            "https://api.inference.sh/mcp"
+        );
         assert!(remote.versions[0].install.mcp.is_none());
     }
 }

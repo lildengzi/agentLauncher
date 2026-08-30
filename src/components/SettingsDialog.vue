@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { Palette, SlidersHorizontal, KeyRound, Database, Info, Check, Users, Server, Wrench, Network } from "lucide-vue-next";
 import Dialog from "@/components/ui/Dialog.vue";
 import Button from "@/components/ui/Button.vue";
@@ -10,11 +10,31 @@ import { useTheme } from "@/lib/theme";
 import { useI18n, type Locale } from "@/lib/i18n";
 
 const open = defineModel<boolean>("open", { default: false });
+/** Which page to show when the dialog opens. Set by whoever opens it — an editor
+ *  window links straight to 模型与 API, because that page is the only editor of the
+ *  app-level key store. An unknown name is ignored rather than blanking the body. */
+const props = defineProps<{ page?: string }>();
 const { t, locale, setLocale } = useI18n();
 const { current, themes, setTheme } = useTheme();
 
-type Section = "appearance" | "general" | "model" | "sources" | "about";
+/** The pages that exist. Named here rather than derived from `nav` below so the
+ *  open-at-a-page watch cannot run before `nav` is initialised. */
+const SECTIONS = ["appearance", "general", "model", "sources", "about"] as const;
+type Section = (typeof SECTIONS)[number];
 const section = ref<Section>("appearance");
+
+function isSection(v: string | undefined): v is Section {
+  return !!v && (SECTIONS as readonly string[]).includes(v);
+}
+// Jump on open, and also when the page changes while already open: a second click
+// on 管理密钥… from an editor window must move the page, not do nothing.
+watch(
+  () => [open.value, props.page] as const,
+  ([isOpen, page]) => {
+    if (isOpen && isSection(page)) section.value = page;
+  },
+  { immediate: true }
+);
 
 /** One left-nav row. `id: null` marks a section that is spec'd but not built:
  *  it is listed, disabled, and badged 「规划中」 rather than hidden, so the
