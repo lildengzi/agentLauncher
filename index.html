@@ -4,9 +4,146 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>agentLauncher</title>
+
+    <!-- The launch screen. It has to live in the HTML, because #app is empty until
+         main.ts has hydrated the launcher config from ~/.agentlauncher/ (two Tauri
+         calls) and, in dev, until the stylesheet has been injected by the module
+         graph — nothing Vue owns can paint that stretch. Four jobs:
+
+         1. Paint the right canvas colour on the very first frame, from a
+            localStorage cache theme.ts keeps for exactly this (fallback: Prism
+            Void, the default theme), so a light theme does not flash dark either.
+         2. Show a real progress bar, the way a game launcher does: the fill is
+            pushed by src/lib/boot.ts as each startup step lands, and the stripes
+            keep moving in between so the bar is never a still object.
+         3. Stay on screen a beat (see MIN_MS in boot.ts) — an animation that only
+            appears on a slow machine is one nobody ever sees.
+         4. Hand over softly. #boot is an overlay, not a child of #app, so the UI
+            fades in underneath it while it fades out. Without that the app arrives
+            in one hard cut.
+
+         No text is baked in here: the status line is filled by boot.ts, which knows
+         the locale (agentlauncher.locale, the same first-paint cache i18n keeps). -->
+    <script>
+      (function () {
+        var fallback = "220 12% 5%|220 12% 86%|216 52% 52%";
+        var raw;
+        try {
+          raw = localStorage.getItem("agentlauncher.paint") || fallback;
+        } catch (e) {
+          raw = fallback;
+        }
+        var c = raw.split("|");
+        var s = document.documentElement.style;
+        s.setProperty("--background", c[0]);
+        s.setProperty("--foreground", c[1]);
+        s.setProperty("--primary", c[2]);
+      })();
+    </script>
+    <style>
+      html,
+      body,
+      #app {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background-color: hsl(var(--background, 220 12% 5%));
+      }
+      /* Invisible until boot.ts says so. Nothing paints in between: mount and the
+         reveal both happen after the launch screen has had its minimum time. */
+      #app {
+        opacity: 0;
+      }
+      #app.ready {
+        opacity: 1;
+        animation: boot-app-in 0.22s ease-out;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: hsl(var(--background, 220 12% 5%));
+        transition: opacity 0.2s ease;
+      }
+      #boot.done {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .boot-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 13px;
+        font-family: "Adwaita Sans", Inter, "Segoe UI", "Noto Sans SC", sans-serif;
+        font-weight: 500;
+      }
+      .boot-name {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: hsl(var(--foreground, 220 12% 86%) / 0.7);
+      }
+      /* Square corners and a hard 1px frame: this is a launcher bar, not a pill. */
+      .boot-bar {
+        width: 300px;
+        height: 10px;
+        overflow: hidden;
+        background: hsl(var(--foreground, 220 12% 86%) / 0.07);
+        box-shadow: inset 0 0 0 1px hsl(var(--foreground, 220 12% 86%) / 0.13);
+      }
+      .boot-bar span {
+        display: block;
+        width: 7%;
+        height: 100%;
+        /* Barber-pole stripes. The 16.97px shift is one full diagonal period
+           (12px / cos 45°), so the loop has no seam. */
+        background-image: repeating-linear-gradient(
+          -45deg,
+          hsl(var(--primary, 216 52% 52%)) 0 6px,
+          hsl(var(--primary, 216 52% 52%) / 0.5) 6px 12px
+        );
+        box-shadow: 0 0 10px hsl(var(--primary, 216 52% 52%) / 0.55);
+        animation: boot-stripe 0.55s linear infinite;
+        transition: width 0.38s cubic-bezier(0.22, 0.68, 0.3, 1);
+      }
+      .boot-msg {
+        min-height: 1.2em;
+        font-size: 12px;
+        color: hsl(var(--foreground, 220 12% 86%) / 0.45);
+      }
+      @keyframes boot-stripe {
+        to {
+          background-position: 16.97px 0;
+        }
+      }
+      @keyframes boot-app-in {
+        from {
+          opacity: 0;
+        }
+      }
+      /* The stripes are decoration and they go. The fill still advances — that one
+         is the information, not the motion. */
+      @media (prefers-reduced-motion: reduce) {
+        .boot-bar span {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="boot">
+      <div class="boot-wrap">
+        <div class="boot-name">agentLauncher</div>
+        <div class="boot-bar"><span id="boot-fill"></span></div>
+        <div class="boot-msg" id="boot-msg"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

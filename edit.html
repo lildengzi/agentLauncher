@@ -6,9 +6,124 @@
     <!-- The real title is set by open_edit_window from the instance name; this is
          only what shows before the window paints. -->
     <title>agentLauncher</title>
+
+    <!-- The same launch screen as index.html, for the same reason: this window also
+         waits on the launcher config before mounting, and a newly opened editor
+         window is where a hard cut is most visible. The four jobs it does are
+         explained in index.html; keep the two in step. -->
+    <script>
+      (function () {
+        var fallback = "220 12% 5%|220 12% 86%|216 52% 52%";
+        var raw;
+        try {
+          raw = localStorage.getItem("agentlauncher.paint") || fallback;
+        } catch (e) {
+          raw = fallback;
+        }
+        var c = raw.split("|");
+        var s = document.documentElement.style;
+        s.setProperty("--background", c[0]);
+        s.setProperty("--foreground", c[1]);
+        s.setProperty("--primary", c[2]);
+      })();
+    </script>
+    <style>
+      html,
+      body,
+      #app {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background-color: hsl(var(--background, 220 12% 5%));
+      }
+      #app {
+        opacity: 0;
+      }
+      #app.ready {
+        opacity: 1;
+        animation: boot-app-in 0.22s ease-out;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: hsl(var(--background, 220 12% 5%));
+        transition: opacity 0.2s ease;
+      }
+      #boot.done {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .boot-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 13px;
+        font-family: "Adwaita Sans", Inter, "Segoe UI", "Noto Sans SC", sans-serif;
+        font-weight: 500;
+      }
+      .boot-name {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: hsl(var(--foreground, 220 12% 86%) / 0.7);
+      }
+      .boot-bar {
+        width: 300px;
+        height: 10px;
+        overflow: hidden;
+        background: hsl(var(--foreground, 220 12% 86%) / 0.07);
+        box-shadow: inset 0 0 0 1px hsl(var(--foreground, 220 12% 86%) / 0.13);
+      }
+      .boot-bar span {
+        display: block;
+        width: 7%;
+        height: 100%;
+        background-image: repeating-linear-gradient(
+          -45deg,
+          hsl(var(--primary, 216 52% 52%)) 0 6px,
+          hsl(var(--primary, 216 52% 52%) / 0.5) 6px 12px
+        );
+        box-shadow: 0 0 10px hsl(var(--primary, 216 52% 52%) / 0.55);
+        animation: boot-stripe 0.55s linear infinite;
+        transition: width 0.38s cubic-bezier(0.22, 0.68, 0.3, 1);
+      }
+      .boot-msg {
+        min-height: 1.2em;
+        font-size: 12px;
+        color: hsl(var(--foreground, 220 12% 86%) / 0.45);
+      }
+      @keyframes boot-stripe {
+        to {
+          background-position: 16.97px 0;
+        }
+      }
+      @keyframes boot-app-in {
+        from {
+          opacity: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-bar span {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="boot">
+      <div class="boot-wrap">
+        <div class="boot-name">agentLauncher</div>
+        <div class="boot-bar"><span id="boot-fill"></span></div>
+        <div class="boot-msg" id="boot-msg"></div>
+      </div>
+    </div>
     <script type="module" src="/src/edit.ts"></script>
   </body>
 </html>

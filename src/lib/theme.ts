@@ -9,10 +9,23 @@ import { themes, getTheme, DEFAULT_THEME } from "@/lib/themes";
 import { config } from "@/lib/launcherConfig";
 
 const FAST_CACHE = "agentlauncher.theme";
+/** The three colours the boot splash in index.html / edit.html paints with. */
+const PAINT_CACHE = "agentlauncher.paint";
 
 function apply(id: string): void {
   const theme = getTheme(id);
   const root = document.documentElement;
+  // The splash runs before any module loads, so it cannot read themes.ts — leave
+  // it the resolved triples of the theme now in force. Written on every apply
+  // (bootstrap included) so a cache from an older build self-heals on first run.
+  try {
+    localStorage.setItem(
+      PAINT_CACHE,
+      [theme.vars["--background"], theme.vars["--foreground"], theme.vars["--primary"]].join("|")
+    );
+  } catch {
+    /* ignore — a private-mode webview just gets the default-theme fallback */
+  }
   // Clear first: `apply` writes inline properties, so a var a previous theme set
   // but this one omits would otherwise linger on <html> forever.
   for (const k of Object.keys(themes[0].vars)) {

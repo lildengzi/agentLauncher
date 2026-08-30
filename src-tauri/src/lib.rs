@@ -126,6 +126,11 @@ fn open_edit_window(app: AppHandle, id: String) -> Result<(), String> {
         .title(format!("{} — agentLauncher", inst.name))
         .inner_size(900.0, 680.0)
         .min_inner_size(720.0, 520.0)
+        // The window and webview exist before edit.html is parsed, and their
+        // default is white — a flash the boot splash in the HTML cannot cover
+        // because it is not loaded yet. #0b0c0e is the default theme's canvas
+        // (Prism Void), the same value tauri.conf.json gives the main window.
+        .background_color(tauri::window::Color(11, 12, 14, 255))
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())
