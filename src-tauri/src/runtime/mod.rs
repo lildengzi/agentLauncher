@@ -125,13 +125,25 @@ pub trait AgentRuntime: Send + Sync {
 
 /// Build a `Command` for `default_bin`, or for `custom_bin` when it is non-empty
 /// (its directory has already been put on PATH by the executor; see runtime::env).
+///
+/// On Windows the default binary is resolved to an absolute path first, because a
+/// bare `claude` is not launchable there: npm installs the CLI as `claude.cmd`,
+/// and CreateProcess only ever appends `.exe`. Detection already follows this rule
+/// ([`crate::engines::find_on_path`]), so resolving here is what keeps "installed"
+/// and "launchable" the same claim. Unresolvable falls through to the bare name so
+/// the failure message stays the one the user can act on.
 fn program(custom_bin: &str, default_bin: &str) -> Command {
     let bin = custom_bin.trim();
-    if bin.is_empty() {
-        Command::new(default_bin)
-    } else {
-        Command::new(bin)
+    if !bin.is_empty() {
+        return Command::new(bin);
     }
+    if cfg!(windows) {
+        let path_var = std::env::var("PATH").unwrap_or_default();
+        if let Some(found) = crate::engines::find_on_path(default_bin, &path_var) {
+            return Command::new(found);
+        }
+    }
+    Command::new(default_bin)
 }
 
 /// Resolve the runtime for an instance by its `runtime.engine`. Unknown, empty,

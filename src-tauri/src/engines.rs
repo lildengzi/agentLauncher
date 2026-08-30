@@ -90,20 +90,61 @@ pub struct EngineInfo {
     pub path: String,
 }
 
+/// Executable suffixes tried on Windows, in this order, before the bare name.
+///
+/// Deliberately *not* read from `PATHEXT`: that variable answers "what would a
+/// shell run", while the question here is "what can the launcher spawn". Rust's
+/// `Command` reaches `.exe`/`.com` through CreateProcess and `.cmd`/`.bat`
+/// through cmd.exe — but nothing can spawn the `.ps1` that npm writes next to
+/// every `.cmd`, so accepting it would only trade a false "not installed" for a
+/// launch that fails later.
+const WIN_EXTS: [&str; 4] = [".exe", ".cmd", ".bat", ".com"];
+
+/// The file names to try for `bin` inside one PATH directory.
+///
+/// On Windows an agent CLI installed by npm/pnpm lands as `claude.cmd`, never as
+/// a bare `claude`, so looking up the bare name alone finds nothing — which is
+/// why every engine used to report "not installed" there. The bare name is still
+/// tried, but *last*, so a spawnable shim always wins over the extension-less sh
+/// script npm drops beside it for Git Bash.
+fn win_name_candidates(bin: &str) -> Vec<String> {
+    let lower = bin.to_ascii_lowercase();
+    if WIN_EXTS.iter().any(|e| lower.ends_with(e)) {
+        // Already explicit — a `custom_bin` pointing straight at the executable.
+        return vec![bin.to_string()];
+    }
+    let mut out: Vec<String> = WIN_EXTS.iter().map(|e| format!("{bin}{e}")).collect();
+    out.push(bin.to_string());
+    out
+}
+
 /// Find `bin` on a colon/semicolon-separated PATH, returning the first match.
+///
+/// Directory-major, suffix-minor: every candidate name is tried in one directory
+/// before moving to the next, the same precedence `cmd.exe` gives PATHEXT.
 ///
 /// `pub(crate)` because terminal discovery ([`crate::runtime::term`]) must follow
 /// exactly this rule — PATH lookup, no disk scan, never executing the candidate.
 /// One implementation, so the two can't drift apart.
 pub(crate) fn find_on_path(bin: &str, path_var: &str) -> Option<String> {
     let sep = if cfg!(windows) { ';' } else { ':' };
+    let names = if cfg!(windows) {
+        win_name_candidates(bin)
+    } else {
+        vec![bin.to_string()]
+    };
     for dir in path_var.split(sep) {
+        // Windows PATH entries are sometimes quoted; a literal quote is never
+        // part of a directory name on either platform.
+        let dir = dir.trim().trim_matches('"');
         if dir.is_empty() {
             continue;
         }
-        let candidate = std::path::Path::new(dir).join(bin);
-        if candidate.is_file() {
-            return Some(candidate.to_string_lossy().into_owned());
+        for name in &names {
+            let candidate = std::path::Path::new(dir).join(name);
+            if candidate.is_file() {
+                return Some(candidate.to_string_lossy().into_owned());
+            }
         }
     }
     None
@@ -174,6 +215,48 @@ mod tests {
             Some(bin.to_string_lossy().as_ref())
         );
         assert_eq!(find_on_path("not-there", &path_var), None);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // Windows name expansion is unit-tested on every platform (the lookup itself
+    // is `cfg!(windows)`-gated, so a Linux CI run can only reach it here).
+    #[test]
+    fn win_candidates_try_spawnable_shims_before_the_bare_name() {
+        assert_eq!(
+            win_name_candidates("claude"),
+            [
+                "claude.exe",
+                "claude.cmd",
+                "claude.bat",
+                "claude.com",
+                "claude"
+            ]
+        );
+        // npm writes `claude.ps1` beside `claude.cmd`; nothing can spawn it, so
+        // it must never be what detection reports.
+        assert!(!win_name_candidates("claude")
+            .iter()
+            .any(|c| c.ends_with(".ps1")));
+    }
+
+    #[test]
+    fn win_candidates_leave_an_explicit_executable_alone() {
+        for bin in [r"C:\tools\dsh.exe", r"C:\tools\DSH.EXE", "pi.cmd"] {
+            assert_eq!(win_name_candidates(bin), [bin.to_string()], "{bin}");
+        }
+    }
+
+    #[test]
+    fn find_on_path_ignores_quotes_and_padding_around_a_dir() {
+        let dir = std::env::temp_dir().join(format!("agentlauncher-quoted-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let bin = dir.join("fake-engine");
+        std::fs::write(&bin, b"#!/bin/sh\n").unwrap();
+        let path_var = format!(" \"{}\" ", dir.display());
+        assert_eq!(
+            find_on_path("fake-engine", &path_var).as_deref(),
+            Some(bin.to_string_lossy().as_ref())
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 }
