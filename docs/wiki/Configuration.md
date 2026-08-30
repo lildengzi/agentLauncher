@@ -4,9 +4,9 @@
 
 ## 引擎 · Engine
 
-每个实例的 `runtime.engine` 任选其一：`dsh` · `pi` · `omp` · `claude` · `codex` · `opencode`（见 [Instance Anatomy](Instance-Anatomy#自由组合--框架--llm) 矩阵）。`设置` 面板通过 `detect_engines` 实时探测宿主已装 CLI；`custom_bin` 可覆盖为绝对路径。
+每个实例的 `runtime.engine` 任选其一（可扩展，当前已适配 `dsh` 等，见 [Instance Anatomy](Instance-Anatomy#自由组合--框架--llm) 矩阵）。`设置` 面板通过 `detect_engines` 实时探测宿主已装 CLI；`custom_bin` 可覆盖为绝对路径。
 
-- **仅 `dsh` 支持 web 服务**，其余 5 个引擎当前只跑 headless 一次性任务。
+- web 服务取决于引擎能力（如 `dsh` 支持，其余引擎以 headless 为主）。
 - `provider`/`model` 为空即省略对应 flag，让引擎用自身默认值。
 
 ## Profile · 运行档位（仅 `dsh`）
@@ -35,7 +35,7 @@ agent-default-model:
 
 ## 凭据 · Credentials
 
-- **按实例（通用）**：实例目录下的 `.env`（如 `DEEPSEEK_API_KEY=` / `ANTHROPIC_API_KEY=` 等），启动时注入子进程——所有 6 个引擎统一落点。
+- **按实例（通用）**：实例目录下的 `.env`（如 `DEEPSEEK_API_KEY=` / `ANTHROPIC_API_KEY=` 等），启动时注入子进程——多引擎统一落点。
 - **全局（仅 `dsh`）**：`~/.dsh/.credentials.yaml`（扁平 KV，权限 `0600`），`dsh` 专用。
 
 > 🔐 密钥值**永不返回给前端 UI**；凭据文件保持 `0600`。切勿把密钥提交进 git。

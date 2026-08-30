@@ -244,14 +244,14 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
   <canvas id="prism" aria-hidden="true"></canvas>
   <div class="wrap hero-grid">
     <div>
-      <div class="eyebrow"><span class="lang-zh">PRISM 式 · AI AGENT 启动器</span><span class="lang-en">PRISM-STYLE · AGENT LAUNCHER</span></div>
+      <div class="eyebrow"><span class="lang-zh">通用 · AI AGENT 启动器</span><span class="lang-en">UNIVERSAL · AGENT LAUNCHER</span></div>
       <h1 style="margin-top:18px">
-        <span class="lang-zh">六个引擎，<br><span class="spec">一整排</span>专属 Agent。</span>
-        <span class="lang-en">Six engines,<br>a whole <span class="spec">shelf</span> of agents.</span>
+        <span class="lang-zh">一个启动器，<br><span class="spec">一整排</span>专属 Agent。</span>
+        <span class="lang-en">One launcher,<br>a whole <span class="spec">shelf</span> of agents.</span>
       </h1>
       <p class="lede">
-        <span class="lang-zh">像 Prism Launcher 管理 Minecraft 实例那样，管理你的 AI Agent —— 每个实例任选一个引擎（<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>）、独立沙箱、独立模型与密钥，一键启动。</span>
-        <span class="lang-en">Manage AI agents the way Prism Launcher manages Minecraft instances — each instance picks one of six engines (<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>), its own sandbox, model and keys — one click to launch.</span>
+        <span class="lang-zh">为每个 AI Agent 提供独立沙箱——任选一个引擎、独立模型与密钥，一键启动。多引擎可扩展，当前已适配多种 CLI。</span>
+        <span class="lang-en">Give each AI agent an isolated sandbox — pick any engine, its own model and keys — one click to launch. Multi-engine, extensible.</span>
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#start"><span class="lang-zh">快速上手</span><span class="lang-en">Get started</span> →</a>
@@ -284,8 +284,8 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
     <div class="sec-head reveal">
       <hr class="spectrum-rule">
       <div class="eyebrow" style="margin-top:16px"><span class="lang-zh">理念</span><span class="lang-en">The idea</span></div>
-      <h2><span class="lang-zh">把「隔离哲学」搬给 AI Agent。</span><span class="lang-en">Bring the isolation philosophy to AI agents.</span></h2>
-      <p><span class="lang-zh">Minecraft 玩家早就懂：不同的整合包，各自一个隔离实例，互不污染。AI Agent 也一样 —— 别再把所有工具、提示词、密钥塞进同一个环境。agentLauncher 给每个 Agent 一个干净的沙箱目录，然后像点「启动」一样把它跑起来。</span><span class="lang-en">Minecraft players figured this out long ago: each modpack gets its own isolated instance, none polluting the others. Agents deserve the same — stop cramming every tool, prompt and key into one environment. agentLauncher gives each agent a clean sandboxed directory, then runs it with a single Launch.</span></p>
+      <h2><span class="lang-zh">给每个 Agent 一个隔离的家。</span><span class="lang-en">Give each agent an isolated home.</span></h2>
+      <p><span class="lang-zh">别再把所有工具、提示词、密钥塞进同一个环境。agentLauncher 给每个 Agent 一个干净的沙箱目录——独立的引擎、模型、插件与密钥——然后像点「启动」一样把它跑起来。</span><span class="lang-en">Stop cramming every tool, prompt and key into one environment. agentLauncher gives each agent a clean sandboxed directory — its own engine, model, plugins and keys — then runs it with a single Launch.</span></p>
     </div>
     <div class="shot reveal" role="img" aria-label="agentLauncher dashboard illustration">
       <div class="shot-bar">
@@ -389,7 +389,7 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
       <hr class="spectrum-rule">
       <div class="eyebrow" style="margin-top:16px"><span class="lang-zh">原理</span><span class="lang-en">How it works</span></div>
       <h2><span class="lang-zh">轻量外壳，把任意引擎跑起来。</span><span class="lang-en">A light shell that runs any engine.</span></h2>
-      <p><span class="lang-zh">Tauri 2（Rust）负责管理子进程、文件沙箱与凭据；六个 <span class="mono">AgentRuntime</span>（<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>）按 <span class="mono">runtime.engine</span> 分发，其中仅 <span class="mono">dsh</span> 支持 web 服务。</span><span class="lang-en">Tauri 2 (Rust) manages subprocesses, the file sandbox and credentials; six <span class="mono">AgentRuntime</span>s (<span class="mono">dsh</span> · <span class="mono">pi</span> · <span class="mono">omp</span> · <span class="mono">claude</span> · <span class="mono">codex</span> · <span class="mono">opencode</span>) are dispatched by <span class="mono">runtime.engine</span> — only <span class="mono">dsh</span> has a web serve mode.</span></p>
+      <p><span class="lang-zh">Tauri 2（Rust）负责管理子进程、文件沙箱与凭据；<span class="mono">AgentRuntime</span> 按 <span class="mono">runtime.engine</span> 分发，可扩展——新增引擎只需一个 <span class="mono">impl</span>，无需改宿主。</span><span class="lang-en">Tauri 2 (Rust) manages subprocesses, the file sandbox and credentials; <span class="mono">AgentRuntime</span>s are dispatched by <span class="mono">runtime.engine</span> — extensible, one <span class="mono">impl</span> per engine.</span></p>
     </div>
     <div class="flow">
       <div class="step reveal">
@@ -444,7 +444,7 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
   <div class="wrap foot-in">
     <div>
       <a class="brand" href="#top"><span class="dot"></span>agent<span style="color:var(--iris)">▸</span>launcher</a>
-      <p class="foot-tag"><span class="lang-zh">基于 Prism Launcher 隔离哲学的 AI Agent 图形化启动器。</span><span class="lang-en">A graphical launcher for AI agents, built on Prism Launcher's isolation philosophy.</span></p>
+      <p class="foot-tag"><span class="lang-zh">为隔离实例而生的通用 AI Agent 启动器。</span><span class="lang-en">A universal launcher for isolated AI agent instances.</span></p>
       <div class="badges">
         <span class="pill">Tauri 2 · Rust</span>
         <span class="pill">Vue 3 · Vite</span>
@@ -453,7 +453,7 @@ footer{border-top:1px solid var(--border-soft);background:var(--surface);padding
     </div>
     <div style="text-align:right">
       <div class="stackline"><span class="lang-zh">管理，不插手对话。</span><span class="lang-en">Manage. Don't intercept the chat.</span></div>
-      <div class="stackline" style="margin-top:8px;opacity:.7">v0.1.0 · MVP</div>
+      <div class="stackline" style="margin-top:8px;opacity:.7">v0.2.0</div>
     </div>
   </div>
 </footer>

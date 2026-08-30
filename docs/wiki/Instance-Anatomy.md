@@ -43,7 +43,7 @@
 #### 自由组合 · 框架 × LLM
 一个实例 = 任选一个**框架**（`runtime.engine`，即哪个 Agent CLI）× 任选一个 **LLM**（顶层 `provider` + `model`）。二者正交、自由搭配：
 
-- **`runtime.engine`** = 框架/CLI（缺失或空 → `dsh`，向后兼容）。当前支持 6 个：
+- **`runtime.engine`** = 框架/CLI（缺失或空 → `dsh`，向后兼容）。当前已适配（如 `dsh` · `pi` · `omp` · `claude` · `codex` · `opencode` 等，持续扩展）：
 
   | engine | 程序 | headless 调用契约 | provider 注入 | model 注入 |
   |---|---|---|---|---|
@@ -56,14 +56,14 @@
 
 - **`provider` + `model`** = LLM 身份。**空值即省略对应 flag**——让所选框架用它自己的默认，不臆测。provider 命名空间**因框架而异**（`pi` 的 `google` ≠ `dsh` 的 `deepseek-official`），启动器只透传字符串、不做跨框架归一，UI 给每个框架一句格式提示。
 - **各框架的 API Key 走各自的 env**（`pi`/`omp` 各自 env、`claude` 的 `ANTHROPIC_API_KEY`、`codex`/`opencode` 各自 env、`dsh` 走 `~/.dsh`）——统一落点即实例 `.env`（启动时注入子进程）。**密钥边界不变，不进任何契约文件。**
-- **web（交互式）本轮仍 dsh 独有**；其余 5 个框架本轮只接 headless（一次性任务）。
+- **web（交互式）当前仅部分引擎支持**（如 `dsh`），其余以 headless 一次性任务运行。
 
-> 这张矩阵不是文档里的口头承诺：`src-tauri/src/runtime/model_test.rs` 是「框架 × LLM」的测试总表，`cargo test` 逐行断言每个框架真正 exec 出的 program + argv（含「空值即省略」与 `custom_bin` 覆盖），再**真实建出 6 个实例**落盘、按 UI 的读路径回读、由 `for_instance` 组出命令行——建实例→落盘→回读→分发→argv 全链路自动化；最后对宿主上已装的每个引擎跑一次只读的 `--version`，证明启动器要 exec 的那个二进制确实在、确实能跑（不消耗任何额度；未装的引擎自动跳过）。
+> 这张矩阵不是口头承诺：`src-tauri/src/runtime/model_test.rs` 是「框架 × LLM」测试总表，`cargo test` 逐行断言已适配引擎真正 exec 出的 program + argv（含「空值即省略」与 `custom_bin` 覆盖），再真实建实例落盘、按 UI 读路径回读、由 `for_instance` 组命令行——全链路自动化；最后对宿主已装引擎跑只读 `--version` 存活探测（不消耗额度，未装自动跳过）。
 
 #### `runtime` — 宿主适配（运行时/环境 Override）
 启动器是从桌面环境启动的 GUI 进程，子进程默认继承它那份**被裁剪过的 PATH**——终端里能跑的 `dsh`（及其依赖的 node）从图标启动却可能 `无法启动`。`runtime` 就是每个实例对宿主环境的覆盖：
 
-- **`engine`**：见上「自由组合」——决定 spawn 哪个 Agent CLI（六个 `AgentRuntime` 实现并列在 `src-tauri/src/runtime/model.rs` 一个文件里，测试总表在 `runtime/model_test.rs`）。
+- **`engine`**：见上「自由组合」——决定 spawn 哪个 Agent CLI（多个 `AgentRuntime` 实现并列在 `src-tauri/src/runtime/model.rs` 一个文件里，可扩展；测试总表在 `runtime/model_test.rs`）。
 - **`env_policy`**：
   - `autodetect`（默认）——启动前从**登录 shell** 探测 PATH 并并入子进程，让它看到与终端一致的工具链。**PATH 每次启动现探，绝不缓存落盘**（缓存会过期指向已删二进制）。
   - `isolated`——只给最小的确定性系统 PATH，不泄漏宿主整套工具链，面向可复现沙箱。

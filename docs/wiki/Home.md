@@ -1,7 +1,6 @@
 # agentLauncher Wiki
 
-> *Manage AI agents the way Prism Launcher manages Minecraft instances.*
-> 像 Prism Launcher 管理 Minecraft 实例一样，管理你的 AI Agent。
+> A universal launcher for isolated AI agent instances.
 
 欢迎来到 **agentLauncher** 的文档。这里是把 [README](https://github.com/lildengzi/agentLauncher#readme) 之外的细节讲透的地方。
 
@@ -22,8 +21,8 @@
 - **它是什么**：一个 AI Agent 的图形化**启动器 / 管理器**（不是聊天客户端）。
 - **它管什么**：实例（引擎 · profile / 模型 / 插件 / 凭据 / `.env`）、插件 Hub、设置。
 - **交互在哪**：**`dsh` 的 web 实例**在 dsh 自己的网页里（启动器抓端口并开浏览器）；其余 5 个引擎以 headless 一次性任务运行，日志流式回显。
-- **技术栈**：Tauri 2 (Rust) + Vue 3 + Vite + TailwindCSS；6 个 `AgentRuntime`（`dsh` · `pi` · `omp` · `claude` · `codex` · `opencode`，仅 `dsh` 有 web）。
+- **技术栈**：Tauri 2 (Rust) + Vue 3 + Vite + TailwindCSS；多引擎 `AgentRuntime` 可扩展（当前已适配 `dsh` 等）。
 
-## ⚠️ 关于灵感来源 · A note on inspiration
+## 备注
 
-界面与「实例隔离」理念深受 [Prism Launcher](https://prismlauncher.org/) 启发。agentLauncher 是一个**独立项目**，与 Prism Launcher、Mojang、DeepSeek 官方均无隶属关系。
+实例隔离的交互灵感来自 [Prism Launcher](https://prismlauncher.org/)，本项目为独立实现，与 Prism Launcher / Mojang / DeepSeek 无隶属关系。

@@ -25,7 +25,7 @@
 ```
 
 - **`ui`**：主题与语言。原先分别存在 `localStorage` 的 `agentlauncher.theme` / `agentlauncher.locale`，现收口于此；`localStorage` 仅保留一份极小缓存供首屏秒画，真相是本文件。
-- **`defaults`**：新建实例对话框的预填值（**非密钥**）。原 `agentlauncher.modelConfig` 的非密钥部分迁移至此。两个字段**默认都是空串**，含义是「用所选框架自己的默认」——与 adapter 的「空值即省略 flag」同一规则；写一个具体厂商默认对六个框架里的五个都是错的，连 dsh 也不对（它要的是 `deepseek-official` 而非 `deepseek`）。
+- **`defaults`**：新建实例对话框的预填值（**非密钥**）。原 `agentlauncher.modelConfig` 的非密钥部分迁移至此。两个字段**默认都是空串**，含义是「用所选框架自己的默认」——与 adapter 的「空值即省略 flag」同一规则；写一个具体厂商默认值对大多框架都是错的（连 dsh 也不对，它要的是 `deepseek-official` 而非 `deepseek`）。
   - **已退役**：`base_url`（从未到达任何框架——base URL 走实例 `.env`）与 `profile`（dsh 专属旋钮且无 UI，永远只是它自己的默认值）。旧 `config.json` 仍带着它们也能正常读取（未知键被忽略）。
 - **`session`**：跨启动恢复的瞬态 UX——上次选中的实例、上次使用的分组。
 
@@ -75,7 +75,7 @@
 
 ### 已落地 · 曾在路线图上
 
-- **`runtime.engine`（多引擎）**：已落地。`runtime/mod.rs::for_instance` 按 `runtime.engine` 分发到 6 个 `AgentRuntime` 实现（`dsh`/`pi`/`omp`/`claude`/`codex`/`opencode`，见 [Instance Anatomy](Instance-Anatomy#自由组合--框架--llm) 的调用矩阵）。字段与 6 个消费者同时到位，正是「渐进泛化」的落地示范。
+- **`runtime.engine`（多引擎）**：已落地。`runtime/mod.rs::for_instance` 按 `runtime.engine` 分发到各 `AgentRuntime` 实现（见 [Instance Anatomy](Instance-Anatomy#自由组合--框架--llm) 矩阵）。字段与消费者同时到位，正是「渐进泛化」的落地示范。
 - **宿主引擎探测**：原计划的 **`engines.json`**（引擎路径缓存）**有意不落盘**——改由 `detect_engines` 命令**每次实时探测** PATH（复用 `runtime/env.rs` 的登录 shell 逻辑），与「PATH 现探不缓存」同一铁律：缓存会过期指向已删二进制。
 
 ### 已删除 · 反向执行同一条规矩

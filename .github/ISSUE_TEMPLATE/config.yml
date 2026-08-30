@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/lildengzi/agentLauncher/discussions
     about: 不确定是 Bug 还是 Feature？先来讨论区聊聊
   - name: 文档 / Docs
-    url: https://github.com/lildengzi/agentLauncher/tree/main/docs/wiki
+    url: https://github.com/lildengzi/agentLauncher/wiki
     about: 查看 Wiki 与架构文档
