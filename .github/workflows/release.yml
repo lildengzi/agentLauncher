@@ -154,6 +154,12 @@ jobs:
           set -e
           RELEASE_DIR="target/${{ matrix.target }}/release"
           ARCH="${{ matrix.arch }}"
+          # The hand-made archives below are the only asset names this workflow
+          # invents, so they follow the shape Tauri's own bundlers use:
+          # agentLauncher_<version>_<os>_<arch>. Read from the manifest, not from
+          # the tag, so a workflow_dispatch run on a branch still names them right.
+          # node, not jq: setup-node already ran, so it is guaranteed on every image.
+          VERSION=$(node -p "require('./tauri.conf.json').version")
           mkdir -p dist
 
           # Native installers built by Tauri: .deb, .rpm, .AppImage
@@ -175,7 +181,7 @@ jobs:
           fi
 
           # Raw binary (zipped) for people who just want the executable.
-          zip -j "dist/agentlauncher-${ARCH}-linux.zip" "${RELEASE_DIR}/agentlauncher"
+          zip -j "dist/agentLauncher_${VERSION}_linux_${ARCH}.zip" "${RELEASE_DIR}/agentlauncher"
 
           echo "== dist contents =="
           ls -lh dist/
@@ -187,18 +193,17 @@ jobs:
           set -e
           RELEASE_DIR="target/${{ matrix.target }}/release"
           ARCH="${{ matrix.arch }}"
+          VERSION=$(node -p "require('./tauri.conf.json').version")
           mkdir -p dist
 
-          # Native installer: .dmg (renamed per-arch so x86_64 and aarch64 don't collide)
-          for dmg in "${RELEASE_DIR}/bundle/dmg/"*.dmg; do
-            [ -e "$dmg" ] || continue
-            cp "$dmg" "dist/agentlauncher-${ARCH}-macos.dmg"
-          done
+          # Native installer: .dmg, under Tauri's own name — it already carries the
+          # arch (x64 / aarch64), so the two macOS jobs cannot collide on the release.
+          cp "${RELEASE_DIR}/bundle/dmg/"*.dmg dist/ 2>/dev/null || true
 
           # .app bundle (zipped, since .app is a directory)
           APP=$(ls -d "${RELEASE_DIR}/bundle/macos/"*.app 2>/dev/null | head -1)
           if [ -n "$APP" ]; then
-            (cd "$(dirname "$APP")" && zip -qr - "$(basename "$APP")") > "dist/agentlauncher-${ARCH}-macos.zip"
+            (cd "$(dirname "$APP")" && zip -qr - "$(basename "$APP")") > "dist/agentLauncher_${VERSION}_macos_${ARCH}.zip"
           fi
 
           echo "== dist contents =="
@@ -211,6 +216,7 @@ jobs:
         run: |
           $releaseDir = "target/${{ matrix.target }}/release"
           $arch = "${{ matrix.arch }}"
+          $version = (Get-Content tauri.conf.json -Raw | ConvertFrom-Json).version
           New-Item -ItemType Directory -Force -Path "dist" | Out-Null
 
           # Native installers: MSI + NSIS setup .exe (uploaded directly)
@@ -218,7 +224,7 @@ jobs:
           Copy-Item "${releaseDir}/bundle/nsis/*.exe" "dist/" -ErrorAction SilentlyContinue
 
           # Portable: zip of the raw executable
-          Compress-Archive -Path "${releaseDir}/agentlauncher.exe" -DestinationPath "dist/agentlauncher-${arch}-windows.zip" -Force
+          Compress-Archive -Path "${releaseDir}/agentlauncher.exe" -DestinationPath "dist/agentLauncher_${version}_windows_${arch}.zip" -Force
 
           Write-Host "== dist contents =="
           Get-ChildItem dist | Format-Table Name,Length
