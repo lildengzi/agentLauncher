@@ -11,7 +11,12 @@
 //!   * `isolated`   — a minimal, deterministic PATH that does not leak the
 //!     host toolchain; only system dirs plus any `custom_bin` directory.
 //!
-//! A non-empty `custom_bin` always contributes its own directory to the front.
+//! A non-empty `custom_bin` always contributes its own directory to the front,
+//! followed by the launcher's own runtimes bin dir ([`crate::runtimes`]) — in
+//! *both* policies, because a CLI the launcher installed is not host toolchain
+//! leakage; it is the launcher's own equipment, as deterministic as `/usr/bin`.
+//! Prepending it here is also what makes a freshly installed CLI launchable with
+//! no restart and no edit to the user's PATH.
 
 use std::path::Path;
 use std::time::Duration;
@@ -108,16 +113,23 @@ async fn login_shell_path() -> Option<String> {
 
 /// Resolve the PATH to set on the child process for this instance, or `None`
 /// to leave the inherited PATH untouched (only when policy is unrecognized).
+///
+/// Precedence is custom_bin > launcher-managed > host. An explicit `custom_bin`
+/// is the user naming a binary, so nothing may shadow it; the managed dir comes
+/// next so one-click install wins over a stale copy elsewhere on the host, which
+/// is the only ordering where "the launcher installed it for you" is a true
+/// statement about what then runs.
 pub async fn resolve_child_path(env_policy: &str, custom_bin: &str) -> Option<String> {
     let dir = custom_bin_dir(custom_bin);
     let dir_ref = dir.as_deref().unwrap_or("");
+    let managed = crate::runtimes::bin_dir().unwrap_or_default();
     match env_policy {
-        "isolated" => Some(join_dedup(&[dir_ref, &system_path()])),
+        "isolated" => Some(join_dedup(&[dir_ref, &managed, &system_path()])),
         // "autodetect" (and any unknown value) enrich the host PATH; treating an
         // unknown policy as autodetect is the safe, launch-succeeds default.
         _ => {
             let shell = login_shell_path().await.unwrap_or_default();
-            Some(join_dedup(&[dir_ref, &shell, &process_path()]))
+            Some(join_dedup(&[dir_ref, &managed, &shell, &process_path()]))
         }
     }
 }
@@ -155,5 +167,32 @@ mod tests {
     fn custom_bin_dir_of_empty_is_none() {
         assert_eq!(custom_bin_dir(""), None);
         assert_eq!(custom_bin_dir("   "), None);
+    }
+
+    /// The launcher's own runtimes bin dir is on the child PATH under *both*
+    /// policies, after an explicit `custom_bin` and before anything from the host.
+    /// This ordering is the whole reason one-click install needs no restart and no
+    /// edit to the user's PATH.
+    #[test]
+    fn managed_runtimes_dir_sits_between_custom_bin_and_the_host() {
+        let _lock = crate::test_support::HOME_LOCK.lock().unwrap();
+        let home = crate::test_support::temp_tree("env-managed");
+        let _guard = crate::test_support::EnvGuard::set("HOME", home.path());
+        let managed = crate::runtimes::bin_dir().unwrap();
+
+        for policy in ["isolated", "autodetect"] {
+            let p = tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(resolve_child_path(policy, "/opt/tools/dsh/bin/dsh"))
+                .unwrap();
+            let entries: Vec<&str> = p.split(':').collect();
+            let at = |d: &str| entries.iter().position(|e| *e == d);
+            let (custom, mgd) = (at("/opt/tools/dsh/bin"), at(&managed));
+            assert!(mgd.is_some(), "{policy}: managed dir missing from {p}");
+            assert!(custom < mgd, "{policy}: custom_bin must win: {p}");
+            if let Some(sys) = at("/usr/bin") {
+                assert!(mgd < Some(sys), "{policy}: managed before host: {p}");
+            }
+        }
     }
 }
