@@ -1,7 +1,7 @@
 [package]
 name = "agentlauncher"
-version = "0.1.0"
-description = "AI Agent GUI launcher built on dsh"
+version = "0.2.0"
+description = "A universal launcher for isolated AI agent instances"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/lildengzi/agentLauncher"
