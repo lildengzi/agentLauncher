@@ -9,7 +9,6 @@ import { computed } from "vue";
 import { ChevronDown, ChevronRight } from "lucide-vue-next";
 import AppIcon from "@/components/ui/AppIcon.vue";
 import Avatar from "@/components/ui/Avatar.vue";
-import { brandForModel } from "@/lib/brand";
 import { useI18n } from "@/lib/i18n";
 import { applyOverlay, isCollapsed, toggleCollapsed } from "@/lib/instGroups";
 import type { Instance } from "@/types";
@@ -73,7 +72,6 @@ function isRunning(id: string): boolean {
               <Avatar
                 :seed="inst.id"
                 :icon="inst.icon"
-                :brand="brandForModel(inst.model)"
                 :size="56"
               />
               <span

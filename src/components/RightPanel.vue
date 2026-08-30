@@ -7,7 +7,6 @@
 import { computed } from "vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import ActionButton from "@/components/ui/ActionButton.vue";
-import { brandForModel } from "@/lib/brand";
 import { useI18n } from "@/lib/i18n";
 import type { Instance, RunStatus } from "@/types";
 
@@ -44,7 +43,6 @@ const runActive = computed(
         <Avatar
           :seed="instance.id"
           :icon="instance.icon"
-          :brand="brandForModel(instance.model)"
           :size="72"
         />
         <div class="mt-1 break-all text-center text-[15px] font-semibold leading-tight text-foreground">

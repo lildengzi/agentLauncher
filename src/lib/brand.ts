@@ -1,8 +1,12 @@
-// Maps a model/provider identity onto an official brand mark from the
-// `simple-icons` library (real, maintained brand SVGs — never hand-drawn).
-// Instances whose model belongs to a known provider render that provider's
-// logo in its official color; anything else falls back to the deterministic
-// gradient-mesh avatar. simple-icons exposes { path, hex, title } per brand.
+// Maps an identity onto an official brand mark from the `simple-icons` library
+// (real, maintained brand SVGs — never hand-drawn). simple-icons exposes
+// { path, hex, title } per brand.
+//
+// Two consumers, and only two: the icon picker's brand grid, and the default icon a
+// new instance starts from — which is decided by its **engine** alone (see
+// `defaultIcon`). There is deliberately no longer any inference from the model id:
+// a mark guessed from `deepseek-reasoner` fought the mark the engine asked for, and
+// an instance's icon should say which agent it is, not which vendor it dials.
 import {
   siDeepseek,
   siClaude,
@@ -46,30 +50,9 @@ function b(icon: { path: string; hex: string; title: string }): Brand {
   return { path: icon.path, hex: icon.hex, title: icon.title };
 }
 
-// Ordered rules: first regex to match the model id wins.
-// Covers every provider that has a real icon in simple-icons@16.28 plus
-// vendored OpenAI. Free-form `provider`/`model` strings still work —
-// unmatched values fall back to the Lucide `bot` avatar (see Avatar.vue).
-const MODEL_RULES: { re: RegExp; brand: Brand }[] = [
-  { re: /deepseek/i, brand: b(siDeepseek) },
-  { re: /claude/i, brand: b(siClaude) },
-  { re: /gpt|openai|^o[13](-|\b)|codex/i, brand: b(siOpenai) },
-  { re: /gemini|palm|bison/i, brand: b(siGooglegemini) },
-  { re: /qwen|tongyi|alibaba/i, brand: b(siQwen) },
-  { re: /mistral|mixtral|codestral/i, brand: b(siMistralai) },
-  { re: /kimi|moonshot/i, brand: b(siMoonshotai) },
-  // Perplexity sonar family: sonar, sonar-pro, sonar-reasoning
-  { re: /perplexity|sonar/i, brand: b(siPerplexity) },
-  { re: /minimax/i, brand: b(siMinimax) },
-  { re: /doubao|bytedance/i, brand: b(siBytedance) },
-  { re: /ernie|baidu/i, brand: b(siBaidu) },
-  { re: /ollama/i, brand: b(siOllama) },
-  { re: /llama/i, brand: b(siMetaai) },
-  { re: /huggingface/i, brand: b(siHuggingface) },
-  { re: /replicate/i, brand: b(siReplicate) },
-  { re: /opencode/i, brand: b(siOpencode) },
-];
-
+// The marks the icon picker offers, keyed by the slug a user is most likely to
+// recognise. Free-form `provider` strings no longer consult this table — it exists to
+// generate `BRAND_CHOICES` below, and to give `ENGINE_ICONS` something to point at.
 const PROVIDER_BRANDS: Record<string, Brand> = {
   // DeepSeek
   deepseek: b(siDeepseek),
@@ -113,18 +96,6 @@ const PROVIDER_BRANDS: Record<string, Brand> = {
   openrouter: b(siOpenrouter),
   opencode: b(siOpencode),
 };
-
-/** Brand for a model id (e.g. "deepseek-reasoner" → DeepSeek), or null. */
-export function brandForModel(model: string | null | undefined): Brand | null {
-  if (!model) return null;
-  return MODEL_RULES.find((r) => r.re.test(model))?.brand ?? null;
-}
-
-/** Brand for an explicit provider slug, or null. */
-export function brandForProvider(provider: string | null | undefined): Brand | null {
-  if (!provider) return null;
-  return PROVIDER_BRANDS[provider.toLowerCase()] ?? null;
-}
 
 // ---- the icon picker's catalogue ------------------------------------------
 // `instance.icon` used to be one thing — a lucide glyph name, typed into a text box.
@@ -187,22 +158,15 @@ const ENGINE_ICONS: Record<string, string> = {
 };
 
 /**
- * The icon a new instance should start from, given what it is actually made of.
+ * The icon a new instance starts from: **whatever its engine looks like**, and `bot`
+ * only while no engine has been picked yet.
  *
- * The old default was the literal string `"bot"` — a grey robot on every tile, which
- * told the user nothing and looked like a placeholder because it was one. An instance
- * that runs DeepSeek should arrive wearing DeepSeek's mark; the picker is then for
- * *changing* that, not for rescuing it.
- *
- * Order is most-specific-first: the model names the vendor, the provider names it less
- * precisely, and the engine is the last thing that can say anything at all.
+ * It used to guess from the model id first, most-specific-first — which meant an
+ * opencode instance pointed at a DeepSeek model arrived wearing DeepSeek's mark, and
+ * the one thing the tile was supposed to tell you at a glance (which agent is this?)
+ * was the one thing it did not say. The picker is for changing this; it is not a
+ * rescue from a bad guess, because there is no longer a guess.
  */
-export function defaultIcon(opts: {
-  engine?: string | null;
-  provider?: string | null;
-  model?: string | null;
-}): string {
-  const found = brandForModel(opts.model) ?? brandForProvider(opts.provider);
-  if (found) return iconIdForBrand(found);
-  return ENGINE_ICONS[(opts.engine ?? "").toLowerCase()] ?? "bot";
+export function defaultIcon(engine: string | null | undefined): string {
+  return ENGINE_ICONS[(engine ?? "").trim().toLowerCase()] ?? "bot";
 }

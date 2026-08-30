@@ -6,7 +6,6 @@ import Button from "@/components/ui/Button.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import StatusDot from "@/components/ui/StatusDot.vue";
 import LogTerminal from "@/components/LogTerminal.vue";
-import { brandForModel } from "@/lib/brand";
 import { useI18n } from "@/lib/i18n";
 import type { Instance, RunStatus } from "@/types";
 
@@ -30,7 +29,7 @@ const busy = computed(
   <Dialog v-model:open="open" width="max-w-4xl" class="h-[80vh]">
     <template #header>
       <div class="flex items-center gap-2">
-        <Avatar v-if="instance" :seed="instance.id" :icon="instance.icon" :brand="brandForModel(instance.model)" :size="20" />
+        <Avatar v-if="instance" :seed="instance.id" :icon="instance.icon" :size="20" />
         <span class="text-[16px] font-semibold text-foreground">
           {{ instance?.name ?? t('console.title') }}
         </span>

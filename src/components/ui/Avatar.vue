@@ -4,15 +4,15 @@
 //
 // Priority:
 //   1. `image` (a real PNG/SVG URL) — drawn as-is.
-//   2. a brand the *user chose* — `icon` of the form `brand:deepseek`.
-//   3. `brand` (a mark inferred from the model) — the vector logo in its own color.
-//   4. otherwise — a Lucide glyph, hue-derived from `seed` so instances stay
+//   2. a brand — `icon` of the form `brand:deepseek`, the vector logo in its own color.
+//   3. otherwise — a Lucide glyph, hue-derived from `seed` so instances stay
 //      distinguishable at a glance.
 //
-// 2 sits above 3 on purpose: a mark picked in 选择图标 is a decision, and a mark
-// derived from the model id is a guess. The guess must not overrule the decision when
-// the two disagree — which they will, the moment somebody points an OpenAI-compatible
-// gateway at a Qwen model.
+// `icon` is the only source, on purpose. There used to be a third layer: a mark
+// inferred from the model id, passed in by the callers as `brand`. It fought this one —
+// an instance that stored a plain glyph still rendered a vendor logo the moment its
+// model id happened to name that vendor — so the guess is gone. What was picked (or
+// derived from the engine at creation, see `defaultIcon`) is what gets drawn.
 import { computed } from "vue";
 import AppIcon from "@/components/ui/AppIcon.vue";
 import { brandForIcon, type Brand } from "@/lib/brand";
@@ -22,12 +22,11 @@ const props = withDefaults(
     seed: string;
     icon?: string;
     image?: string | null;
-    brand?: Brand | null;
     size?: number;
     /** rounded-square (default) or full circle — only affects `image`. */
     round?: boolean;
   }>(),
-  { icon: "bot", image: null, brand: null, size: 56, round: false }
+  { icon: "bot", image: null, size: 56, round: false }
 );
 
 // Stable string hash → hue 0..359.
@@ -57,8 +56,8 @@ const imageStyle = computed(() => ({
 const artPx = computed(() => Math.round(props.size * 0.86));
 const iconColor = computed(() => `hsl(${seedHue.value} 55% 68%)`);
 
-/** The chosen mark, else the inferred one. */
-const mark = computed<Brand | null>(() => brandForIcon(props.icon) ?? props.brand);
+/** The mark this icon names, or null when it names a lucide glyph. */
+const mark = computed<Brand | null>(() => brandForIcon(props.icon));
 </script>
 
 <template>
