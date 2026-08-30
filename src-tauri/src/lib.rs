@@ -7,6 +7,7 @@ mod launcher_config;
 mod market;
 mod providers;
 mod runtime;
+mod runtimes;
 #[cfg(test)]
 mod test_support;
 
@@ -154,6 +155,8 @@ pub fn run() {
             open_edit_window,
             open_settings,
             engines::detect_engines,
+            runtimes::runtimes_status,
+            runtimes::install_engine,
             instance_ext::read_instance_extensions,
             instance_ext::read_instance_agents,
             instance_ext::write_instance_agents,

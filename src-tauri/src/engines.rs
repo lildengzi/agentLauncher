@@ -11,6 +11,25 @@ use serde::Serialize;
 
 use crate::runtime::env;
 
+/// How the launcher can install an engine into its own runtimes dir (see
+/// [`crate::runtimes`]).
+///
+/// A recipe, not a command string, because the install methods are genuinely
+/// heterogeneous: on one Arch box the six engines came from five different
+/// sources. Every `Npm` package name below was verified against the running
+/// binary's version, not guessed — the obvious short names on npm (`pi`, `omp`,
+/// `pi-coding-agent`, `oh-my-pi`) are *other people's* packages, stale by whole
+/// major versions, and installing one of those would be a supply-chain hazard
+/// dressed up as a convenience.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Install {
+    /// One npm package whose published `bin` name equals `default_bin`.
+    Npm(&'static str),
+    /// No automated path we can vouch for — the UI offers the docs link and a
+    /// command to copy instead of a button that must fail.
+    Manual,
+}
+
 /// A known agent CLI the launcher can drive.
 pub struct EngineSpec {
     /// Stable id stored in `instance.runtime.engine` (matches AgentRuntime::id).
@@ -26,6 +45,11 @@ pub struct EngineSpec {
     /// in the instance `.env` — so the UI hides the field rather than collecting
     /// a value the launcher would silently drop.
     pub takes_provider: bool,
+    /// How one-click install gets this engine, if it can.
+    pub install: Install,
+    /// Where a user goes to install or read about it by hand. Shown for every
+    /// engine, and the only thing offered for `Install::Manual`.
+    pub docs: &'static str,
 }
 
 /// The static catalog of engines the launcher knows how to assemble commands for.
@@ -37,6 +61,8 @@ pub fn known_engines() -> &'static [EngineSpec] {
             default_bin: "dsh",
             takes_provider: true,
             web: true,
+            install: Install::Npm("@deepseek-ai/dsh"),
+            docs: "https://www.npmjs.com/package/@deepseek-ai/dsh",
         },
         EngineSpec {
             id: "pi",
@@ -44,6 +70,10 @@ pub fn known_engines() -> &'static [EngineSpec] {
             default_bin: "pi",
             takes_provider: true,
             web: false,
+            // Not `pi-coding-agent` (a stranger's 0.0.1). The real name comes from
+            // the installer manifest pi ships in its own GitHub release.
+            install: Install::Npm("@earendil-works/pi-coding-agent"),
+            docs: "https://github.com/earendil-works/pi",
         },
         EngineSpec {
             id: "omp",
@@ -51,6 +81,9 @@ pub fn known_engines() -> &'static [EngineSpec] {
             default_bin: "omp",
             takes_provider: true,
             web: false,
+            // Built from source by its packagers; no npm artifact we can identify.
+            install: Install::Manual,
+            docs: "https://omp.sh/",
         },
         EngineSpec {
             id: "claude",
@@ -58,6 +91,8 @@ pub fn known_engines() -> &'static [EngineSpec] {
             default_bin: "claude",
             takes_provider: false,
             web: false,
+            install: Install::Npm("@anthropic-ai/claude-code"),
+            docs: "https://github.com/anthropics/claude-code",
         },
         EngineSpec {
             id: "codex",
@@ -65,6 +100,8 @@ pub fn known_engines() -> &'static [EngineSpec] {
             default_bin: "codex",
             takes_provider: true,
             web: false,
+            install: Install::Npm("@openai/codex"),
+            docs: "https://github.com/openai/codex",
         },
         EngineSpec {
             id: "opencode",
@@ -72,6 +109,8 @@ pub fn known_engines() -> &'static [EngineSpec] {
             default_bin: "opencode",
             takes_provider: true,
             web: false,
+            install: Install::Npm("opencode-ai"),
+            docs: "https://github.com/anomalyco/opencode",
         },
     ]
 }
@@ -88,6 +127,42 @@ pub struct EngineInfo {
     pub installed: bool,
     /// Absolute path of the resolved binary, or empty when not found.
     pub path: String,
+    /// `"npm"` or `"manual"` — which install affordance the UI may offer.
+    pub install: String,
+    /// The npm package name for `"npm"`, empty for `"manual"`. Shown verbatim in
+    /// the install dialog, because the user is entitled to see what would be
+    /// fetched before agreeing to fetch it.
+    pub package: String,
+    pub docs: String,
+    /// Whether the resolved binary is the copy the launcher installed, rather than
+    /// one the user already had on PATH.
+    pub managed: bool,
+}
+
+impl EngineInfo {
+    /// Present one spec together with the result of probing for its binary.
+    fn from_probe(e: &EngineSpec, found: Option<String>, managed_prefix: Option<&str>) -> Self {
+        let (install, package) = match e.install {
+            Install::Npm(pkg) => ("npm", pkg),
+            Install::Manual => ("manual", ""),
+        };
+        let managed = match (&found, managed_prefix) {
+            (Some(p), Some(prefix)) => p.starts_with(prefix),
+            _ => false,
+        };
+        EngineInfo {
+            id: e.id.to_string(),
+            display: e.display.to_string(),
+            web: e.web,
+            takes_provider: e.takes_provider,
+            installed: found.is_some(),
+            path: found.unwrap_or_default(),
+            install: install.to_string(),
+            package: package.to_string(),
+            docs: e.docs.to_string(),
+            managed,
+        }
+    }
 }
 
 /// Executable suffixes tried on Windows, in this order, before the bare name.
@@ -151,29 +226,39 @@ pub(crate) fn find_on_path(bin: &str, path_var: &str) -> Option<String> {
 }
 
 /// Probe the host for each known engine's binary, using the same enriched PATH
-/// the launcher would give a child (login-shell PATH ∪ process PATH). Fresh each
-/// call — never cached.
+/// the launcher would give a child (login-shell PATH ∪ process PATH, with the
+/// launcher's own runtimes dir in front). Fresh each call — never cached.
 #[tauri::command]
 pub async fn detect_engines() -> Vec<EngineInfo> {
     // Reuse the autodetect PATH resolution so detection matches what a launched
-    // child would actually see (fixes the GUI thin-PATH case).
+    // child would actually see (fixes the GUI thin-PATH case, and means a CLI the
+    // launcher just installed is found without a restart).
     let path_var = env::resolve_child_path("autodetect", "")
         .await
         .unwrap_or_default();
+    let managed = crate::runtimes::bin_dir();
     known_engines()
         .iter()
         .map(|e| {
             let found = find_on_path(e.default_bin, &path_var);
-            EngineInfo {
-                id: e.id.to_string(),
-                display: e.display.to_string(),
-                web: e.web,
-                takes_provider: e.takes_provider,
-                installed: found.is_some(),
-                path: found.unwrap_or_default(),
-            }
+            EngineInfo::from_probe(e, found, managed.as_deref())
         })
         .collect()
+}
+
+/// Re-probe one engine, for the installer to report what it actually produced.
+/// Same PATH rules as [`detect_engines`]; `None` for an unknown id.
+pub(crate) async fn probe_one(id: &str) -> Option<EngineInfo> {
+    let spec = known_engines().iter().find(|e| e.id == id)?;
+    let path_var = env::resolve_child_path("autodetect", "")
+        .await
+        .unwrap_or_default();
+    let found = find_on_path(spec.default_bin, &path_var);
+    Some(EngineInfo::from_probe(
+        spec,
+        found,
+        crate::runtimes::bin_dir().as_deref(),
+    ))
 }
 
 #[cfg(test)]
@@ -196,6 +281,31 @@ mod tests {
                 e.id
             );
         }
+    }
+
+    /// Every install recipe must be actionable: an `Npm` row needs a package name
+    /// for the dialog to show before the user agrees to fetch it, and every row
+    /// needs a docs URL, because `Manual` has nothing else to offer.
+    #[test]
+    fn every_recipe_is_actionable() {
+        for e in known_engines() {
+            assert!(e.docs.starts_with("https://"), "{}: docs url", e.id);
+            if let Install::Npm(pkg) = e.install {
+                assert!(!pkg.is_empty(), "{}: empty package name", e.id);
+                // The short, obvious names on npm are other people's packages,
+                // stale by whole major versions; installing one would be a
+                // supply-chain hazard dressed up as a convenience. Every name in
+                // the catalog was matched against the running binary's version.
+                assert_ne!(pkg, e.default_bin, "{}: suspiciously short name", e.id);
+            }
+        }
+        // omp is the one engine built from git source by its packagers.
+        let manual: Vec<&str> = known_engines()
+            .iter()
+            .filter(|e| e.install == Install::Manual)
+            .map(|e| e.id)
+            .collect();
+        assert_eq!(manual, ["omp"]);
     }
 
     #[test]

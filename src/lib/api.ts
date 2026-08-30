@@ -7,6 +7,8 @@ import type {
   EngineInfo,
   InstGroups,
   Instance,
+  InstallDoneEvent,
+  InstallLogEvent,
   InstallSpec,
   InstanceExtensions,
   InstanceKeyView,
@@ -19,6 +21,7 @@ import type {
   ProviderView,
   RuntimeLogEvent,
   RuntimeStatusEvent,
+  RuntimesStatus,
   SourceStatus,
   SourcesDoc,
 } from "@/types";
@@ -61,6 +64,19 @@ export const api = {
 
   /** Live-probe which known agent engines (CLIs) are installed on the host. */
   detectEngines: () => invoke<EngineInfo[]>("detect_engines"),
+
+  /** Where one-click install would put things, and whether the toolchain it needs
+   *  is there. Read-only — creates no directory. */
+  runtimesStatus: () => invoke<RuntimesStatus>("runtimes_status"),
+  /**
+   * Install one engine into the launcher's private runtimes dir.
+   *
+   * Only ever called from an explicit press: this fetches third-party code and
+   * then runs it. A rejected promise means it could not start (no npm, no
+   * automated source, one already running) and nothing was logged; once started,
+   * progress arrives as `onInstallLog` and the outcome as `onInstallDone`.
+   */
+  installEngine: (id: string) => invoke<void>("install_engine", { id }),
 
   // ---- per-instance extensions (edit dialog's three sections) -------------
   /**
@@ -220,4 +236,21 @@ export function onRuntimeStatus(
  *  listener, because it is the only window that owns the settings surface. */
 export function onOpenSettings(cb: (page: string) => void): Promise<UnlistenFn> {
   return listen<string>("open-settings", (evt) => cb(evt.payload));
+}
+
+// ---- Install events -------------------------------------------------------
+// Emitted by src-tauri/src/runtimes.rs. Deliberately *not* `runtime-log`: that
+// event is instance-scoped (every payload carries an `instance_id`), and an
+// install belongs to no instance — it is the launcher equipping itself.
+
+export function onInstallLog(
+  cb: (e: InstallLogEvent) => void
+): Promise<UnlistenFn> {
+  return listen<InstallLogEvent>("install-log", (evt) => cb(evt.payload));
+}
+
+export function onInstallDone(
+  cb: (e: InstallDoneEvent) => void
+): Promise<UnlistenFn> {
+  return listen<InstallDoneEvent>("install-done", (evt) => cb(evt.payload));
 }

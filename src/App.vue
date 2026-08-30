@@ -273,6 +273,7 @@ function onKey(e: KeyboardEvent) {
         :running-ids="runningIds"
         @select="(id: string) => (selectedId = id)"
         @activate="activate"
+        @install="openSettings('tools')"
       />
       <RightPanel
         :instance="selectedInstance"

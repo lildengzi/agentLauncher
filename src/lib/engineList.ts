@@ -8,14 +8,19 @@ import type { EngineInfo, Instance } from "@/types";
 
 /** Used when live detection fails, so the picker is never empty. `installed: true`
  *  across the board is deliberate: a failed probe must not lock a user out of an
- *  engine they have. A real probe result overrides every field here. */
+ *  engine they have. A real probe result overrides every field here.
+ *
+ *  `install`/`package` are left as `manual`/`""` on purpose — offering a one-click
+ *  install off a table that is only reached *because the probe failed* would fetch
+ *  and run code on evidence we just admitted we do not have. The docs link is safe
+ *  and stays. */
 export const FALLBACK_ENGINES: EngineInfo[] = [
-  { id: "dsh", display: "dsh (DeepSeek Harness)", web: true, takes_provider: true, installed: true, path: "" },
-  { id: "pi", display: "pi (pi-coding-agent)", web: false, takes_provider: true, installed: true, path: "" },
-  { id: "omp", display: "omp (oh-my-pi)", web: false, takes_provider: true, installed: true, path: "" },
-  { id: "claude", display: "claude (Claude Code)", web: false, takes_provider: false, installed: true, path: "" },
-  { id: "codex", display: "codex", web: false, takes_provider: true, installed: true, path: "" },
-  { id: "opencode", display: "opencode", web: false, takes_provider: true, installed: true, path: "" },
+  { id: "dsh", display: "dsh (DeepSeek Harness)", web: true, takes_provider: true, installed: true, path: "", install: "manual", package: "", docs: "https://www.npmjs.com/package/@deepseek-ai/dsh", managed: false },
+  { id: "pi", display: "pi (pi-coding-agent)", web: false, takes_provider: true, installed: true, path: "", install: "manual", package: "", docs: "https://github.com/earendil-works/pi", managed: false },
+  { id: "omp", display: "omp (oh-my-pi)", web: false, takes_provider: true, installed: true, path: "", install: "manual", package: "", docs: "https://omp.sh/", managed: false },
+  { id: "claude", display: "claude (Claude Code)", web: false, takes_provider: false, installed: true, path: "", install: "manual", package: "", docs: "https://github.com/anthropics/claude-code", managed: false },
+  { id: "codex", display: "codex", web: false, takes_provider: true, installed: true, path: "", install: "manual", package: "", docs: "https://github.com/openai/codex", managed: false },
+  { id: "opencode", display: "opencode", web: false, takes_provider: true, installed: true, path: "", install: "manual", package: "", docs: "https://github.com/anomalyco/opencode", managed: false },
 ];
 
 /** Probe the host for installed engines, falling back to the table above. Never

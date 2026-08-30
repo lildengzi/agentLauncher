@@ -5,12 +5,14 @@
 // way the reference does; the bound model lives in the edit dialog. Selection is
 // the reference's own: the NAME gets a filled label in the theme's selection
 // colour. No coloured box around the tile, and no invented accent hue.
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { ChevronDown, ChevronRight } from "lucide-vue-next";
 import AppIcon from "@/components/ui/AppIcon.vue";
 import Avatar from "@/components/ui/Avatar.vue";
+import Button from "@/components/ui/Button.vue";
 import { useI18n } from "@/lib/i18n";
 import { applyOverlay, isCollapsed, toggleCollapsed } from "@/lib/instGroups";
+import { probeEngines } from "@/lib/engineList";
 import type { Instance } from "@/types";
 
 const { t } = useI18n();
@@ -19,11 +21,31 @@ const props = defineProps<{
   selectedId: string | null;
   runningIds: string[];
 }>();
-const emit = defineEmits<{ select: [id: string]; activate: [id: string] }>();
+const emit = defineEmits<{
+  select: [id: string];
+  activate: [id: string];
+  install: [];
+}>();
 
 // Group order, collapse and intra-group ordering come from the persisted overlay
 // (instgroups.json); membership stays owned by each instance's `group` field.
 const groups = computed(() => applyOverlay(props.instances));
+
+/** Whether the host has any agent CLI at all. `null` until the probe answers, so
+ *  the empty state never flashes a claim it has not checked.
+ *
+ *  Probed once, here, because this is the one place the answer changes what the
+ *  user should do next: with no instances *and* no CLI, "添加实例" leads to an
+ *  instance that cannot start. Everywhere else the engine list is asked for on
+ *  demand — a launcher-wide probe on boot would be a startup cost paid by every
+ *  user for a message only a first-run one sees. */
+const hasEngine = ref<boolean | null>(null);
+
+onMounted(async () => {
+  if (props.instances.length) return;
+  const list = await probeEngines();
+  hasEngine.value = list.some((e) => e.installed);
+});
 
 function isRunning(id: string): boolean {
   return props.runningIds.includes(id);
@@ -39,6 +61,14 @@ function isRunning(id: string): boolean {
       <AppIcon name="package-open" class="h-8 w-8 text-muted-foreground/50" />
       <p class="text-[14px] text-foreground/80">{{ t('grid.empty.title') }}</p>
       <p class="font-mono text-[12px] text-muted-foreground">{{ t('grid.empty.hint') }}</p>
+      <!-- Only when the probe has answered, and only when the answer is "none":
+           with an engine installed there is nothing to say here. -->
+      <template v-if="hasEngine === false">
+        <p class="mt-2 text-[13px] text-foreground/70">{{ t('grid.empty.noEngine') }}</p>
+        <Button size="sm" variant="outline" @click="emit('install')">
+          {{ t('grid.empty.install') }}
+        </Button>
+      </template>
     </div>
 
     <template v-else>

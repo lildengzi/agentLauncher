@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button.vue";
 import GroupBox from "@/components/ui/GroupBox.vue";
 import SourcesSection from "@/components/settings/SourcesSection.vue";
 import ProvidersSection from "@/components/settings/ProvidersSection.vue";
+import RuntimesSection from "@/components/settings/RuntimesSection.vue";
 import { useTheme } from "@/lib/theme";
 import { useI18n, type Locale } from "@/lib/i18n";
 
@@ -19,7 +20,7 @@ const { current, themes, setTheme } = useTheme();
 
 /** The pages that exist. Named here rather than derived from `nav` below so the
  *  open-at-a-page watch cannot run before `nav` is initialised. */
-const SECTIONS = ["appearance", "general", "model", "sources", "about"] as const;
+const SECTIONS = ["appearance", "general", "model", "sources", "tools", "about"] as const;
 type Section = (typeof SECTIONS)[number];
 const section = ref<Section>("appearance");
 
@@ -47,11 +48,12 @@ const nav: NavEntry[] = [
   { id: "general", icon: SlidersHorizontal, key: "settings.nav.general" },
   { id: "model", icon: KeyRound, key: "settings.nav.model" },
   { id: "sources", icon: Database, key: "settings.nav.sources" },
-  // Prism's Accounts / Services / Tools / Proxy pages, in its order. Still empty
-  // here; each needs a data contract of its own (see docs/spec/step2.md 设置页).
+  // Prism's Accounts / Services / Tools / Proxy pages, in its order. 工具 is real
+  // now — it is where the launcher installs the agent CLIs it manages itself. The
+  // other three still need a data contract of their own (docs/spec/step2.md 设置页).
   { id: null, icon: Users, key: "settings.nav.accounts" },
   { id: null, icon: Server, key: "settings.nav.remote" },
-  { id: null, icon: Wrench, key: "settings.nav.tools" },
+  { id: "tools", icon: Wrench, key: "settings.nav.tools" },
   { id: null, icon: Network, key: "settings.nav.proxy" },
   { id: "about", icon: Info, key: "settings.nav.about" },
 ];
@@ -152,6 +154,12 @@ function swatch(vars: Record<string, string>, key: string): string {
              own load/save cycle so this dialog holds no market state. -->
         <template v-else-if="section === 'sources'">
           <SourcesSection />
+        </template>
+
+        <!-- TOOLS — the launcher's own agent-CLI installs. The section owns its
+             probe and its install log; nothing here runs until a press. -->
+        <template v-else-if="section === 'tools'">
+          <RuntimesSection />
         </template>
 
         <!-- ABOUT -->

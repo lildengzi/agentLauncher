@@ -35,6 +35,47 @@ export interface EngineInfo {
   installed: boolean;
   /** absolute path of the resolved binary, or "" when not found. */
   path: string;
+  /** "npm" — the launcher can install it one-click; "manual" — no source we can
+   *  vouch for, so the dialog offers the docs link and a copyable command. */
+  install: "npm" | "manual";
+  /** the npm package name for "npm", "" for "manual". Shown verbatim before the
+   *  user agrees to fetch it: installing is running someone else's code. */
+  package: string;
+  /** where to install or read about it by hand. Present for every engine. */
+  docs: string;
+  /** whether the resolved binary is the copy the launcher installed, rather than
+   *  one the user already had on PATH. */
+  managed: boolean;
+}
+
+/** Prerequisites for one-click install — mirrors `RuntimesStatus` in
+ *  src-tauri/src/runtimes.rs. Read-only: probing creates nothing. */
+export interface RuntimesStatus {
+  /** absolute path of the launcher's private install prefix. */
+  dir: string;
+  /** resolved `npm`, or "" — the one hard prerequisite for every recipe. */
+  npm: string;
+  /** resolved `node`, or "". Reported separately from npm because only one of the
+   *  two being missing reads very differently, even though the fix is the same. */
+  node: string;
+}
+
+/** One line of installer output. `stream` is "stdout" | "stderr" | "cmd", the last
+ *  being the command itself, echoed before it runs. */
+export interface InstallLogEvent {
+  engine: string;
+  stream: string;
+  chunk: string;
+}
+
+/** How an install turned out, once npm has exited. Arrives once per install; a
+ *  rejected `installEngine()` call means it never started and none of these come. */
+export interface InstallDoneEvent {
+  engine: string;
+  ok: boolean;
+  message: string;
+  /** the re-probed binary path on success — proof it is really there now. */
+  path: string;
 }
 
 /** One dsh profile — mirrors `DshProfile` in src-tauri/src/runtime/dsh_home.rs.
