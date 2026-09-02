@@ -19,9 +19,25 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync", "time"] }
+# `net` is test-only: download's transfer path is exercised against a one-shot
+# server on loopback rather than the network.
+tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync", "time", "fs", "net"] }
 dirs = "5"
 chrono = { version = "0.4", features = ["serde"] }
+# Checksums for the archives `download` puts on disk. Already in the lock as an
+# indirect dependency, so naming it here adds no compile unit.
+sha2 = "0.10"
+# Unpacking the official Node builds. Both formats are compiled on every target
+# rather than `cfg`-gated: gating would mean CI, which runs on Linux, never
+# type-checks the Windows branch — and Windows is already this repo's thinnest path.
+# A few hundred KB of binary buys a zip path that at least compiles.
+# `flate2` is already in the lock (indirect) and defaults to the pure-Rust
+# `miniz_oxide` backend, the same reason this build uses rustls over OpenSSL.
+flate2 = "1"
+tar = "0.4"
+# Only the one codec Node's zips actually use; the default feature set drags in
+# bzip2, zstd and AES, none of which appear in a nodejs.org archive.
+zip = { version = "8", default-features = false, features = ["deflate-flate2"] }
 # Market feeds are fetched here rather than in the webview: a URL the *user* typed
 # owes us no CORS header. rustls only — an OpenSSL/native-tls build would tie the
 # release to whatever libssl each distro ships. `gzip` is not cosmetic: the one feed

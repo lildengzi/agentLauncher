@@ -1,3 +1,4 @@
+mod download;
 mod engines;
 mod executor;
 mod instance_env;
@@ -5,6 +6,7 @@ mod instance_ext;
 mod instance_manager;
 mod launcher_config;
 mod market;
+mod node;
 mod providers;
 mod runtime;
 mod runtimes;
@@ -157,6 +159,10 @@ pub fn run() {
             engines::detect_engines,
             runtimes::runtimes_status,
             runtimes::install_engine,
+            runtimes::install_node,
+            node::node_status,
+            node::uninstall_node,
+            node::test_node,
             instance_ext::read_instance_extensions,
             instance_ext::read_instance_agents,
             instance_ext::write_instance_agents,
@@ -190,6 +196,8 @@ pub fn run() {
             launcher_config::set_launcher_config,
             launcher_config::get_inst_groups,
             launcher_config::set_inst_groups,
+            launcher_config::get_node_settings,
+            launcher_config::set_node_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

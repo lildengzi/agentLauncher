@@ -19,7 +19,10 @@
 
 mod adapters;
 mod cache;
-mod http;
+// `pub(crate)` because the guarded in-memory GET is not market-specific: the Node
+// installer reads `index.json` and `SHASUMS256.txt` through the same capped,
+// scheme-checked, redirect-policed transport rather than growing a second one.
+pub(crate) mod http;
 pub mod install;
 pub mod sources;
 

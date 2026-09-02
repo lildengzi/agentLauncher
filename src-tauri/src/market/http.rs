@@ -15,9 +15,18 @@
 //!     connection and then says nothing cannot wedge a dialog open forever;
 //!   * **byte cap** — counted while streaming, so the cap is reached before the
 //!     memory is, gzip-decompressed size included.
+//!
+//! The first two are [`crate::download`]'s, called rather than copied: a feed URL
+//! and an archive URL are the same kind of hostile input, and two allowlists that
+//! agree today are two allowlists that can disagree later. The whole-response
+//! timeout is the one thing that must *not* be shared — it is right for a JSON
+//! body held in memory and fatal for a 58 MB archive, which is why `download` has
+//! a client of its own.
 
 use std::sync::OnceLock;
 use std::time::Duration;
+
+use crate::download::{redirect_policy, scheme_ok, USER_AGENT};
 
 /// Enough headroom over the 11.6 MB feed we ship that growth does not break it,
 /// while still bounding what one source can cost us.
@@ -30,10 +39,6 @@ pub const MAX_README_BYTES: usize = 1024 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(45);
 
-fn scheme_ok(url: &reqwest::Url) -> bool {
-    matches!(url.scheme(), "http" | "https")
-}
-
 /// One pooled client for the whole process: a market dialog refetches several
 /// sources from the same hosts, and a fresh client per request would throw away
 /// the TLS session and connection pool each time.
@@ -45,20 +50,10 @@ fn client() -> Result<&'static reqwest::Client, String> {
                 .connect_timeout(CONNECT_TIMEOUT)
                 .timeout(REQUEST_TIMEOUT)
                 // A feed does not get to choose the scheme we end up on.
-                .redirect(reqwest::redirect::Policy::custom(|attempt| {
-                    if !scheme_ok(attempt.url()) {
-                        let msg =
-                            format!("refusing redirect to non-http(s) URL: {}", attempt.url());
-                        return attempt.error(msg);
-                    }
-                    if attempt.previous().len() >= 5 {
-                        return attempt.error("too many redirects");
-                    }
-                    attempt.follow()
-                }))
+                .redirect(redirect_policy())
                 // Some hosts reject an empty User-Agent outright, and an honest one
                 // tells a feed operator who is calling.
-                .user_agent(concat!("agentlauncher/", env!("CARGO_PKG_VERSION")))
+                .user_agent(USER_AGENT)
                 .build()
                 .map_err(|e| format!("cannot build HTTP client: {e}"))
         })

@@ -9,6 +9,7 @@ import type {
   Instance,
   InstallDoneEvent,
   InstallLogEvent,
+  InstallProgressEvent,
   InstallSpec,
   InstanceExtensions,
   InstanceKeyView,
@@ -18,6 +19,9 @@ import type {
   MarketQuery,
   McpServerEntry,
   NewInstance,
+  NodeSettings,
+  NodeStatus,
+  NodeTest,
   ProviderView,
   RuntimeLogEvent,
   RuntimeStatusEvent,
@@ -77,6 +81,36 @@ export const api = {
    * progress arrives as `onInstallLog` and the outcome as `onInstallDone`.
    */
   installEngine: (id: string) => invoke<void>("install_engine", { id }),
+
+  // ---- Node, the one prerequisite the launcher provides itself ------------
+  // Prism Launcher does not ask you to install Java; it keeps its own. npm is not
+  // a separate thing to install — every official Node archive ships it — so there
+  // is one page here, and npm shows up on it as a resolved path.
+
+  /** Which `node` (and therefore which `npm`) would be used, and whether it
+   *  clears the floor. Read-only; runs `node --version` only when the settings
+   *  say it may. */
+  nodeStatus: () => invoke<NodeStatus>("node_status"),
+  /** The Node page's settings. */
+  getNodeSettings: () => invoke<NodeSettings>("get_node_settings"),
+  // The key must match the Rust parameter's own name (`settings`) — `invoke` args
+  // are untyped, so a rename here fails at runtime, not at build time.
+  setNodeSettings: (settings: NodeSettings) =>
+    invoke<void>("set_node_settings", { settings }),
+  /**
+   * Download and unpack the launcher's own Node into the private prefix.
+   *
+   * Explicit press only — this fetches a 58 MB archive from nodejs.org and then
+   * runs what is inside it. Progress arrives as `onInstallProgress`, every URL and
+   * step as `onInstallLog` with `engine: "node"`, the outcome as `onInstallDone`.
+   */
+  installNode: () => invoke<void>("install_node"),
+  /** Delete the managed Node tree — one `rm -r`, which is the point of keeping it
+   *  inside our own prefix. Anything the user installed themselves is untouched. */
+  uninstallNode: () => invoke<void>("uninstall_node"),
+  /** Prism's 测试设置: really run `node --version` and `npm --version` and hand
+   *  back what they printed. */
+  testNode: () => invoke<NodeTest>("test_node"),
 
   // ---- per-instance extensions (edit dialog's three sections) -------------
   /**
@@ -253,4 +287,14 @@ export function onInstallDone(
   cb: (e: InstallDoneEvent) => void
 ): Promise<UnlistenFn> {
   return listen<InstallDoneEvent>("install-done", (evt) => cb(evt.payload));
+}
+
+/** Bytes so far while an archive downloads. Emitted by the Node install only; an
+ *  engine install leaves npm to narrate itself in log lines. */
+export function onInstallProgress(
+  cb: (e: InstallProgressEvent) => void
+): Promise<UnlistenFn> {
+  return listen<InstallProgressEvent>("install-progress", (evt) =>
+    cb(evt.payload)
+  );
 }

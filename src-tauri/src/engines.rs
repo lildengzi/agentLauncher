@@ -6,6 +6,15 @@
 //! disk: a persisted `engines.json` would go stale and point at a since-removed
 //! binary — the same foot-gun the PATH resolver avoids (see runtime::env). The
 //! UI uses the result to populate the engine picker and mark missing CLIs.
+//!
+//! Detection also never *runs* a candidate — six spawns would make every refresh
+//! slow, and an agent's own `--version` may phone home or want credentials. There
+//! is exactly one documented exception, and it is not an agent: [`crate::node`]
+//! may run `node --version`, because a version is the whole question there and
+//! there is no other way to ask a Node the launcher did not install. It is gated on
+//! `NodeSettings::auto_detect_version`, the user's standing permission for that one
+//! spawn; with it off, Node detection falls back to this module's plain PATH lookup
+//! and honestly reports an unknown version.
 
 use serde::Serialize;
 
@@ -198,9 +207,10 @@ fn win_name_candidates(bin: &str) -> Vec<String> {
 /// Directory-major, suffix-minor: every candidate name is tried in one directory
 /// before moving to the next, the same precedence `cmd.exe` gives PATHEXT.
 ///
-/// `pub(crate)` because terminal discovery ([`crate::runtime::term`]) must follow
-/// exactly this rule — PATH lookup, no disk scan, never executing the candidate.
-/// One implementation, so the two can't drift apart.
+/// `pub(crate)` because terminal discovery ([`crate::runtime::term`]) and the Node
+/// probe ([`crate::node`]) must follow exactly this rule — PATH lookup, no disk
+/// scan, never executing the candidate. One implementation, so they can't drift
+/// apart.
 pub(crate) fn find_on_path(bin: &str, path_var: &str) -> Option<String> {
     let sep = if cfg!(windows) { ';' } else { ':' };
     let names = if cfg!(windows) {

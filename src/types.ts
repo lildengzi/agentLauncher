@@ -48,16 +48,68 @@ export interface EngineInfo {
   managed: boolean;
 }
 
+/** Everything known about the Node an install would use — mirrors `NodeStatus` in
+ *  src-tauri/src/node.rs. Probing only; nothing here creates or downloads. */
+export interface NodeStatus {
+  /** absolute path of the `node` that would be used, or "". */
+  path: string;
+  /** where it came from: "custom" (the setting), "managed" (the launcher's own),
+   *  "host" (found on PATH), or "" when there is none. */
+  source: "custom" | "managed" | "host" | "";
+  /** e.g. "24.20.0", or "" when unknown — which is the honest answer while
+   *  「自动检测 Node 版本」 is off, because asking means running the binary. */
+  version: string;
+  /** whether this Node may be used: at or above the floor, or the check is
+   *  skipped, or the version is unknown because detection is off. */
+  ok: boolean;
+  /** the minimum version, from the backend — the UI must not hardcode it. */
+  floor: string;
+  /** the `npm` paired with that `node`, or "". Answered together with `node` on
+   *  purpose: npm is a script run *by* node, so resolving them apart is how they
+   *  drift. */
+  npm: string;
+  /** where a managed Node lives (or would live). */
+  dir: string;
+  /** the archive that would be fetched for this machine, with the version left as
+   *  a placeholder — shown before the user agrees to download it. */
+  asset: string;
+  /** non-empty when nodejs.org publishes no build for this target; the text names
+   *  the target and the way out. */
+  unsupported: string;
+}
+
 /** Prerequisites for one-click install — mirrors `RuntimesStatus` in
  *  src-tauri/src/runtimes.rs. Read-only: probing creates nothing. */
 export interface RuntimesStatus {
   /** absolute path of the launcher's private install prefix. */
   dir: string;
-  /** resolved `npm`, or "" — the one hard prerequisite for every recipe. */
-  npm: string;
-  /** resolved `node`, or "". Reported separately from npm because only one of the
-   *  two being missing reads very differently, even though the fix is the same. */
-  node: string;
+  /** the Node/npm pair every recipe needs. */
+  node: NodeStatus;
+}
+
+/** The Node page's settings — mirrors `NodeSettings` in
+ *  src-tauri/src/launcher_config.rs, field-for-field a Prism ▸ Java analogue. */
+export interface NodeSettings {
+  /** explicit `node` path; "" means the launcher's own, or the host's. */
+  exe: string;
+  /** ☑ 自动下载 Node — Prism's 自动下载 Mojang Java. Default on. */
+  auto_download: boolean;
+  /** ☑ 自动检测 Node 版本 — the standing permission to run `node --version`,
+   *  which is the one place the launcher executes a probe candidate. */
+  auto_detect_version: boolean;
+  /** ☐ 跳过 Node 版本检查 — the floor is the highest any engine declares, so it
+   *  is too strict for someone running only the lenient ones. */
+  skip_version_check: boolean;
+  /** Prism's -Xmx: `--max-old-space-size` for npm's own resolve. */
+  max_old_space_mb: number;
+}
+
+/** What 测试设置 found — this one really runs both binaries, on a press. */
+export interface NodeTest {
+  node_path: string;
+  node_output: string;
+  npm_path: string;
+  npm_output: string;
 }
 
 /** One line of installer output. `stream` is "stdout" | "stderr" | "cmd", the last
@@ -76,6 +128,15 @@ export interface InstallDoneEvent {
   message: string;
   /** the re-probed binary path on success — proof it is really there now. */
   path: string;
+}
+
+/** Bytes so far while an archive downloads. Only the Node install emits these —
+ *  npm reports its own progress as log lines, so an engine install sends none.
+ *  `total` is null when the server declares no length. */
+export interface InstallProgressEvent {
+  engine: string;
+  received: number;
+  total: number | null;
 }
 
 /** One dsh profile — mirrors `DshProfile` in src-tauri/src/runtime/dsh_home.rs.

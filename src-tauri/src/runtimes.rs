@@ -55,7 +55,7 @@ pub fn bin_dir() -> Option<String> {
 /// npm walks *upward* from its prefix looking for a manifest to treat as the
 /// project root; without one of ours it could adopt an unrelated ancestor's.
 /// `private` also means npm will never offer to publish this directory.
-fn ensure_prefix() -> Result<PathBuf, String> {
+pub(crate) fn ensure_prefix() -> Result<PathBuf, String> {
     let dir = root().ok_or("cannot resolve home directory")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     #[cfg(unix)]
@@ -80,24 +80,19 @@ fn ensure_prefix() -> Result<PathBuf, String> {
 pub struct RuntimesStatus {
     /// Absolute path of the prefix, so the user can see where things will go.
     pub dir: String,
-    /// Resolved `npm`, or empty. The one hard prerequisite for every recipe.
-    pub npm: String,
-    /// Resolved `node`, or empty. Reported separately because "npm is missing"
-    /// and "node is missing" send the user to the same download but read very
-    /// differently when only one of them is true.
-    pub node: String,
+    /// Everything known about the Node an install would use, including the `npm`
+    /// paired with it. One structure rather than two loose strings here: "which
+    /// node" and "which npm" have to be answered together, because npm is a script
+    /// run *by* node, and answering them in two places is how they drift.
+    pub node: crate::node::NodeStatus,
 }
 
 /// Probe for the toolchain an install needs. Read-only: creates nothing.
 #[tauri::command]
 pub async fn runtimes_status() -> RuntimesStatus {
-    let path_var = env::resolve_child_path("autodetect", "")
-        .await
-        .unwrap_or_default();
     RuntimesStatus {
         dir: root().map(|p| p.display().to_string()).unwrap_or_default(),
-        npm: engines::find_on_path("npm", &path_var).unwrap_or_default(),
-        node: engines::find_on_path("node", &path_var).unwrap_or_default(),
+        node: crate::node::status().await,
     }
 }
 
@@ -127,7 +122,7 @@ fn install_lock() -> &'static Mutex<()> {
     L.get_or_init(Mutex::default)
 }
 
-fn log(app: &AppHandle, engine: &str, stream: &str, chunk: String) {
+pub(crate) fn log(app: &AppHandle, engine: &str, stream: &str, chunk: String) {
     let _ = app.emit(
         "install-log",
         InstallLog {
@@ -165,21 +160,54 @@ where
 /// that produces is what exhausts the resolver — nothing about it gets smaller
 /// with flags, so headroom is the only lever.
 ///
-/// A `--max-old-space-size` already in `NODE_OPTIONS` is left alone: a user who
+/// The number is [`crate::launcher_config::NodeSettings::max_old_space_mb`], not a
+/// constant: it is Prism's `-Xmx`, and it is the only knob that exists for a resolve
+/// that runs out of heap, so it belongs on the settings page rather than in here.
+///
+/// A `--max-old-space-size` already in `NODE_OPTIONS` is still left alone: a user who
 /// set one is more likely to be working around a small machine than to want ours.
 /// The value is a ceiling, not a reservation, so raising it costs nothing when the
 /// resolve happens to be small.
-fn node_options() -> String {
+fn node_options(mb: u32) -> String {
     let existing = std::env::var("NODE_OPTIONS").unwrap_or_default();
     if existing.contains("max-old-space-size") {
         return existing;
     }
-    let ours = "--max-old-space-size=4096";
+    let ours = format!("--max-old-space-size={mb}");
     if existing.trim().is_empty() {
-        ours.to_string()
+        ours
     } else {
         format!("{} {ours}", existing.trim())
     }
+}
+
+/// Download and install the launcher's own Node — the backend of 设置 ▸ Node's
+/// 「下载并安装」 button.
+///
+/// Shares [`install_lock`] with [`install_engine`], because both write into the same
+/// prefix. It is also the *outer* command for a Node install, so it is the one that
+/// emits `install-done`; [`crate::node::install`] deliberately does not.
+#[tauri::command]
+pub async fn install_node(app: AppHandle) -> Result<(), String> {
+    let _guard = install_lock()
+        .try_lock()
+        .map_err(|_| "已有一个安装正在进行，等它结束再来".to_string())?;
+    let done = match crate::node::install(&app).await {
+        Ok(v) => InstallDone {
+            engine: "node".into(),
+            ok: true,
+            message: format!("已安装 Node v{v}"),
+            path: crate::node::bin_dir().unwrap_or_default(),
+        },
+        Err(e) => InstallDone {
+            engine: "node".into(),
+            ok: false,
+            message: e,
+            path: String::new(),
+        },
+    };
+    let _ = app.emit("install-done", done);
+    Ok(())
 }
 
 /// Install one engine into the runtimes prefix with npm.
@@ -222,11 +250,22 @@ pub async fn install_engine(app: AppHandle, id: String) -> Result<(), String> {
         .map_err(|_| "已有一个安装正在进行，等它结束再来".to_string())?;
 
     let dir = ensure_prefix()?;
-    let path_var = env::resolve_child_path("autodetect", "")
+    // One resolution of "which node, and therefore which npm", shared with the
+    // settings page. npm is a script run *by* node, so pairing a managed npm with a
+    // host node (or the reverse) is the one combination guaranteed to misbehave.
+    let base = env::resolve_child_path("autodetect", "")
         .await
         .unwrap_or_default();
-    let npm = engines::find_on_path("npm", &path_var)
-        .ok_or("PATH 上找不到 npm —— 先安装 Node（≥ 22），再回到这里")?;
+    let settings = launcher_config::node_settings();
+    let node = crate::node::probe(&settings, &base).await;
+    if node.npm.is_empty() {
+        return Err(format!(
+            "找不到 npm —— 先在「设置 ▸ Node」里装一个 Node（≥ {}），再回到这里",
+            crate::node::FLOOR
+        ));
+    }
+    let path_var = crate::node::npm_search_path(&node.path, &base);
+    let npm = node.npm;
 
     let target = format!("{pkg}@latest");
     let dir_arg = dir.display().to_string();
@@ -243,7 +282,7 @@ pub async fn install_engine(app: AppHandle, id: String) -> Result<(), String> {
     ];
     // Echoed before anything runs, and echoed as *actually invoked* — heap override
     // included, so the logged line is one a user could rerun by hand.
-    let node_opts = node_options();
+    let node_opts = node_options(settings.max_old_space_mb);
     log(
         &app,
         &id,
@@ -361,15 +400,17 @@ mod tests {
         let _lock = NODE_OPTIONS_LOCK.lock().unwrap();
 
         let _g = EnvGuard::set("NODE_OPTIONS", "");
-        assert_eq!(node_options(), "--max-old-space-size=4096");
+        assert_eq!(node_options(4096), "--max-old-space-size=4096");
+        // The number comes from the setting, so a user who lowers it is obeyed.
+        assert_eq!(node_options(1024), "--max-old-space-size=1024");
 
         let _g = EnvGuard::set("NODE_OPTIONS", "--enable-source-maps");
         assert_eq!(
-            node_options(),
+            node_options(4096),
             "--enable-source-maps --max-old-space-size=4096"
         );
 
         let _g = EnvGuard::set("NODE_OPTIONS", "--max-old-space-size=512");
-        assert_eq!(node_options(), "--max-old-space-size=512");
+        assert_eq!(node_options(4096), "--max-old-space-size=512");
     }
 }

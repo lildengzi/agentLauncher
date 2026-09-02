@@ -73,7 +73,9 @@ async function refresh() {
     ]);
     engines.value = list;
     dir.value = status.dir;
-    npm.value = status.npm;
+    // One resolution of the pair, from the backend: `npm` is a script run *by*
+    // node, so which npm this is depends on which node was chosen.
+    npm.value = status.node.npm;
   } catch (e) {
     error.value = String(e);
   } finally {

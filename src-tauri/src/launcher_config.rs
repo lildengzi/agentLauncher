@@ -83,6 +83,67 @@ pub struct SessionState {
     pub last_used_group: String,
 }
 
+/// The launcher's Node runtime settings — modelled field-for-field on Prism
+/// Launcher's `设置 ▸ Java` page, because Node is to this launcher exactly what
+/// Java is to Prism: a prerequisite the launcher is willing to provide itself
+/// rather than make the user go install.
+///
+/// Every knob here exists because Prism has its analogue, and each one answers a
+/// question that would otherwise be answered by a hardcoded constant:
+///
+///   * `exe` — the escape hatch. Empty means "use whatever the launcher installed,
+///     or the host's". A path here always wins, exactly as `custom_bin` wins for
+///     an engine, and it is the only answer for a platform with no official build
+///     (there is no `linux-arm64-musl` tarball).
+///   * `auto_download` — Prism's ☑ 自动下载 Mojang Java. Named, default-on, and
+///     switchable off: automatic is not the same as silent, and a user who wants
+///     to keep their own toolchain gets to say so once.
+///   * `auto_detect_version` — Prism's ☑ 自动检测 Java 版本, and the reason
+///     detection may run `node --version` at all. Engine detection never executes
+///     a candidate (see [`crate::engines`]); this checkbox is the user's standing
+///     permission for the one exception, and turning it off drops us back to a
+///     pure PATH lookup with no version to report.
+///   * `skip_version_check` — Prism's ☐ 跳过 Java 兼容性检查. The floor is the
+///     highest any engine declares, so it is too strict for most of them: someone
+///     running only `codex` (`>=16`) should not be told their Node 20 is unusable.
+///   * `max_old_space_mb` — Prism's `-Xmx`. Was a hardcoded 4096 in
+///     [`crate::runtimes`]; it is a setting because it is the only lever that
+///     exists for an npm resolve that runs out of heap.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeSettings {
+    #[serde(default)]
+    pub exe: String,
+    #[serde(default = "yes")]
+    pub auto_download: bool,
+    #[serde(default = "yes")]
+    pub auto_detect_version: bool,
+    #[serde(default)]
+    pub skip_version_check: bool,
+    #[serde(default = "default_heap_mb")]
+    pub max_old_space_mb: u32,
+}
+fn yes() -> bool {
+    true
+}
+/// Measured, not precautionary: resolving `@deepseek-ai/dsh@latest` under node's
+/// own default (2144 MB here) dies with `Ineffective mark-compacts near heap
+/// limit` before it downloads anything. A ceiling is not a reservation, so raising
+/// it costs nothing on the installs that never come near it.
+fn default_heap_mb() -> u32 {
+    4096
+}
+impl Default for NodeSettings {
+    fn default() -> Self {
+        Self {
+            exe: String::new(),
+            auto_download: true,
+            auto_detect_version: true,
+            skip_version_check: false,
+            max_old_space_mb: default_heap_mb(),
+        }
+    }
+}
+
 /// The launcher config document.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {
@@ -94,6 +155,8 @@ pub struct LauncherConfig {
     pub defaults: AgentDefaults,
     #[serde(default)]
     pub session: SessionState,
+    #[serde(default)]
+    pub node: NodeSettings,
 }
 impl Default for LauncherConfig {
     fn default() -> Self {
@@ -102,6 +165,7 @@ impl Default for LauncherConfig {
             ui: UiPrefs::default(),
             defaults: AgentDefaults::default(),
             session: SessionState::default(),
+            node: NodeSettings::default(),
         }
     }
 }
@@ -198,6 +262,32 @@ pub fn set_inst_groups(groups: InstGroups) -> Result<(), String> {
     write_json_atomic(&inst_groups_path()?, &groups)
 }
 
+/// Read just the Node section. Its own command (rather than the whole config)
+/// because the Node settings page owns its load/save the way `ProvidersSection`
+/// does — the settings dialog holds no Node state to get out of sync.
+#[tauri::command]
+pub fn get_node_settings() -> Result<NodeSettings, String> {
+    Ok(node_settings())
+}
+
+#[tauri::command]
+pub fn set_node_settings(settings: NodeSettings) -> Result<(), String> {
+    let path = config_path()?;
+    let mut cfg: LauncherConfig = read_or_default(&path);
+    cfg.node = settings;
+    write_json_atomic(&path, &cfg)
+}
+
+/// The Node settings, for backend callers. Falls back to defaults on any problem
+/// reaching the file, same as everything else here: a launcher that cannot read
+/// its config still has to be able to install Node.
+pub(crate) fn node_settings() -> NodeSettings {
+    match config_path() {
+        Ok(p) => read_or_default::<LauncherConfig>(&p).node,
+        Err(_) => NodeSettings::default(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -282,6 +372,44 @@ mod tests {
         fs::write(&p, "not json at all {{{").unwrap();
         let cfg: LauncherConfig = read_or_default(&p);
         assert_eq!(cfg.ui.theme, "prism-dark");
+        fs::remove_file(&p).ok();
+    }
+
+    /// The two Node checkboxes that gate behaviour default *on*, and — the part
+    /// that a plain `#[derive(Default)]` would get wrong — a config.json written
+    /// before this section existed must come back with them on, not off.
+    #[test]
+    fn node_settings_default_to_downloading_and_detecting() {
+        let d = NodeSettings::default();
+        assert!(
+            d.auto_download,
+            "automatic, named, and switchable — not off"
+        );
+        assert!(d.auto_detect_version);
+        assert!(!d.skip_version_check, "the floor applies until asked");
+        assert_eq!(d.max_old_space_mb, 4096);
+        assert!(d.exe.is_empty(), "empty ⇒ managed, else host");
+
+        let p = temp_path("node-absent");
+        fs::write(&p, r#"{"ui":{"theme":"light"}}"#).unwrap();
+        let cfg: LauncherConfig = read_or_default(&p);
+        assert!(cfg.node.auto_download);
+        assert!(cfg.node.auto_detect_version);
+        assert_eq!(cfg.node.max_old_space_mb, 4096);
+
+        // An explicit `false` survives, which is the whole point of a checkbox.
+        fs::write(
+            &p,
+            r#"{"node":{"auto_download":false,"max_old_space_mb":1024}}"#,
+        )
+        .unwrap();
+        let cfg: LauncherConfig = read_or_default(&p);
+        assert!(!cfg.node.auto_download);
+        assert!(
+            cfg.node.auto_detect_version,
+            "unmentioned keys stay default"
+        );
+        assert_eq!(cfg.node.max_old_space_mb, 1024);
         fs::remove_file(&p).ok();
     }
 
