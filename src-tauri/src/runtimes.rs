@@ -116,8 +116,13 @@ struct InstallDone {
 }
 
 /// One install at a time: they share a single npm prefix, and two npm processes
-/// writing one `node_modules` is how you corrupt it.
-fn install_lock() -> &'static Mutex<()> {
+/// writing one `node_modules` is how you corrupt it. `uninstall_node` takes it too,
+/// so 卸载 cannot land in the middle of an install.
+///
+/// Per *process*, which is all a mutex can be. Nothing stops a second launcher from
+/// running, so this is not the last word — see `sweep_leftovers` in
+/// [`crate::node`], which is age-gated for exactly that reason.
+pub(crate) fn install_lock() -> &'static Mutex<()> {
     static L: OnceLock<Mutex<()>> = OnceLock::new();
     L.get_or_init(Mutex::default)
 }
@@ -369,6 +374,7 @@ mod tests {
         let _lock = HOME_LOCK.lock().unwrap();
         let home = temp_tree("runtimes");
         let _guard = EnvGuard::set("HOME", home.path());
+        crate::test_support::assert_home_redirected(home.path());
 
         let dir = ensure_prefix().unwrap();
         assert_eq!(dir, home.path().join(".agentlauncher").join("runtimes"));

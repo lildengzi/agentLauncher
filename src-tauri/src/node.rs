@@ -130,22 +130,32 @@ pub fn dir() -> Option<PathBuf> {
     crate::runtimes::root().map(|r| r.join("node"))
 }
 
-/// The directory holding `node`/`npm`, as a PATH segment.
+/// The directory holding `node`/`npm`, as a real path.
 ///
 /// Unix archives put them in `bin/`; the Windows zip puts `node.exe` and `npm.cmd`
 /// at the root of the extracted directory, with no `bin/` at all. Not created
 /// here — this is called on every launch, and a PATH entry that does not exist yet
 /// is harmless ([`crate::runtime::env`] drops the empty ones).
-pub fn bin_dir() -> Option<String> {
+pub fn bin_path() -> Option<PathBuf> {
     let d = dir()?;
-    let d = if cfg!(windows) { d } else { d.join("bin") };
-    Some(d.to_string_lossy().into_owned())
+    Some(if cfg!(windows) { d } else { d.join("bin") })
+}
+
+/// [`bin_path`] as a PATH segment.
+///
+/// Lossy on purpose and only here, at the boundary where a PATH string is what the
+/// caller needs. Everything that touches the filesystem goes through `bin_path`
+/// instead: a `$HOME` with a non-UTF-8 byte (legal on Linux) would come back with
+/// U+FFFD substituted, and an installed Node would then be invisible to
+/// `managed_exe()` forever while `install` kept writing to the real path.
+pub fn bin_dir() -> Option<String> {
+    Some(bin_path()?.to_string_lossy().into_owned())
 }
 
 /// The `node` executable inside the managed tree, whether or not it exists.
 fn managed_exe() -> Option<PathBuf> {
     let name = if cfg!(windows) { "node.exe" } else { "node" };
-    Some(PathBuf::from(bin_dir()?).join(name))
+    Some(bin_path()?.join(name))
 }
 
 /// `runtimes/node/.version` — written at install, read at probe.
@@ -183,6 +193,12 @@ pub struct Platform {
 /// Known gap: there is no `linux-arm64-musl` build, so Alpine on arm64 has no
 /// automatic answer. That is what the `Node 可执行文件` setting is for, and the
 /// error says so rather than pretending a download would work.
+///
+/// The catch-all arms say the *launcher* has no download for this target, not that
+/// no build exists: nodejs.org does publish `linux-armv7l`, `linux-armv6l`,
+/// `linux-ppc64le` and `linux-s390x`, and telling someone on a Raspberry Pi that
+/// their architecture is unsupported by Node would be a plain lie. Adding one is a
+/// row in this match, which is the point of naming the reason accurately.
 pub fn platform() -> Result<Platform, String> {
     let musl = cfg!(target_env = "musl");
     let p = if cfg!(target_os = "linux") {
@@ -203,7 +219,7 @@ pub fn platform() -> Result<Platform, String> {
                 file_tag: "linux-arm64",
                 ext: ".tar.gz",
             },
-            _ => return Err(unsupported("这个 CPU 架构没有官方构建")),
+            _ => return Err(unsupported("启动器没有为这个 CPU 架构准备下载")),
         }
     } else if cfg!(target_os = "macos") {
         if cfg!(target_arch = "aarch64") {
@@ -219,7 +235,7 @@ pub fn platform() -> Result<Platform, String> {
                 ext: ".tar.gz",
             }
         } else {
-            return Err(unsupported("这个 CPU 架构没有官方构建"));
+            return Err(unsupported("启动器没有为这个 CPU 架构准备下载"));
         }
     } else if cfg!(target_os = "windows") {
         if cfg!(target_arch = "aarch64") {
@@ -235,10 +251,10 @@ pub fn platform() -> Result<Platform, String> {
                 ext: ".zip",
             }
         } else {
-            return Err(unsupported("这个 CPU 架构没有官方构建"));
+            return Err(unsupported("启动器没有为这个 CPU 架构准备下载"));
         }
     } else {
-        return Err(unsupported("这个操作系统没有官方构建"));
+        return Err(unsupported("启动器没有为这个操作系统准备下载"));
     };
     Ok(p)
 }
@@ -318,7 +334,14 @@ pub async fn probe(settings: &NodeSettings, path_var: &str) -> NodeStatus {
     };
 
     let custom = settings.exe.trim();
-    let managed = managed_exe().filter(|p| p.is_file());
+    // A managed tree counts only while the npm that shipped with it is still there.
+    // A `remove_dir_all` that failed halfway — Windows with `node.exe` held open by
+    // a running agent, or an AV quarantine — leaves the executable and `.version`
+    // behind with no `lib/node_modules/npm`, and that must not shadow a working host
+    // Node behind a green row whose install buttons are all dead.
+    let managed = managed_exe()
+        .filter(|p| p.is_file())
+        .filter(|_| managed_npm().is_some());
     if !custom.is_empty() && Path::new(custom).is_file() {
         st.path = custom.to_string();
         st.source = "custom".into();
@@ -341,12 +364,14 @@ pub async fn probe(settings: &NodeSettings, path_var: &str) -> NodeStatus {
     }
     st.ok = match parse_version(&st.version) {
         Some(v) => settings.skip_version_check || v >= FLOOR,
-        // No version and no path is "absent"; a path with no version happens when
-        // detection is switched off, and refusing to proceed then would make the
-        // checkbox a trap.
-        None => {
-            !st.path.is_empty() && (settings.skip_version_check || !settings.auto_detect_version)
-        }
+        // Found, but no version to judge. Two ways to get here — detection is off, or
+        // it ran and the answer was unusable (a 3 s deadline hit on a cold cache, a
+        // version manager's shim printing something else) — and they must agree, or
+        // the same Node reads as broken until the user unticks a checkbox. "We could
+        // not determine it" is not evidence of being too old, and refusing then is a
+        // dead end with no recourse, while letting it through costs at most one npm
+        // error that names the version it wanted.
+        None => !st.path.is_empty(),
     };
     if let Ok(p) = platform {
         st.asset = format!("node-v<版本>-{}{}", p.asset, p.ext);
@@ -373,6 +398,15 @@ pub(crate) fn npm_search_path(node_exe: &str, path_var: &str) -> String {
 fn read_managed_version() -> Option<String> {
     let raw = std::fs::read_to_string(version_file()?).ok()?;
     parse_version(&raw).map(|v| v.to_string())
+}
+
+/// The `npm` that shipped inside the managed tree, if it is still there.
+///
+/// Looked up with the same PATH rules as everything else — and only in the managed
+/// bin directory, so a host `npm` on the real PATH can never stand in for one that
+/// was deleted out of our own tree.
+fn managed_npm() -> Option<String> {
+    crate::engines::find_on_path("npm", &bin_dir()?)
 }
 
 /// Run `<exe> --version` and hand back what it printed, verbatim.
@@ -485,7 +519,7 @@ async fn resolve_latest_lts(app: &AppHandle, p: Platform) -> Result<Pick, String
     let url = http::parse_http_url(&format!("{DIST_BASE}/index.json"))?;
     require_dist_host(&url)?;
     log_cmd(app, format!("$ GET {url}\n"));
-    let body = http::get_capped(&url, MAX_INDEX_BYTES).await?;
+    let body = http::get_capped_pinned(&url, MAX_INDEX_BYTES).await?;
     let pick = pick_lts(&body, p)?;
     log(
         app,
@@ -499,6 +533,13 @@ async fn resolve_latest_lts(app: &AppHandle, p: Platform) -> Result<Pick, String
 /// Every URL here is assembled from a constant, so this can only fire if that
 /// assembly is changed later — which is exactly the mistake worth a guard rather
 /// than a comment.
+///
+/// Only half the pin, and the easy half: this checks the URL we are about to ask
+/// for. Keeping it true for the URL actually *served* is
+/// [`crate::download::same_host_redirect_policy`]'s job, which is why both the
+/// archive and the two metadata fetches here go through clients that hold the host
+/// across every hop. Checked once and then followed anywhere would leave the claim
+/// in this module's header false.
 fn require_dist_host(url: &reqwest::Url) -> Result<(), String> {
     if url.host_str() != Some(DIST_HOST) {
         return Err(format!("拒绝从 {:?} 下载 Node", url.host_str()));
@@ -560,7 +601,7 @@ async fn expected_sha256(app: &AppHandle, v: Version, asset: &str) -> Result<Str
     let url = http::parse_http_url(&format!("{DIST_BASE}/v{v}/SHASUMS256.txt"))?;
     require_dist_host(&url)?;
     log_cmd(app, format!("$ GET {url}\n"));
-    let body = http::get_capped(&url, MAX_SHASUMS_BYTES).await?;
+    let body = http::get_capped_pinned(&url, MAX_SHASUMS_BYTES).await?;
     let text = String::from_utf8_lossy(&body);
     download::sha256_from_manifest(&text, asset)
 }
@@ -592,7 +633,8 @@ fn safe_member(raw: &Path) -> Result<PathBuf, String> {
     Ok(out)
 }
 
-/// Whether a link inside the archive still points inside it.
+/// Whether a link inside the archive still points inside the tree that will be
+/// installed.
 ///
 /// Node's own tarball contains symlinks and they are legitimate: `bin/npm` points
 /// at `../lib/node_modules/npm/bin/npm-cli.js`. So the rule cannot be "no links",
@@ -603,6 +645,12 @@ fn safe_member(raw: &Path) -> Result<PathBuf, String> {
 /// `base_depth` is how deep the link's own directory sits: for a symlink that is
 /// the number of components in its path minus one (targets are relative to the link),
 /// and for a hard link it is `0` (tar resolves those against the archive root).
+///
+/// The floor is depth **1**, not 0, and that is the whole subtlety. Depth 0 is the
+/// staging root, but staging holds one directory and *that* directory is what
+/// becomes `runtimes/node` — so a target resolving to depth 0 lands on the npm
+/// prefix itself after the rename, which is on every child PATH. Everything the
+/// archive legitimately contains lives at depth ≥ 1.
 fn link_stays_inside(base_depth: usize, target: &Path) -> bool {
     if target.is_absolute() {
         return false;
@@ -613,7 +661,7 @@ fn link_stays_inside(base_depth: usize, target: &Path) -> bool {
             Component::CurDir => {}
             Component::ParentDir => {
                 depth -= 1;
-                if depth < 0 {
+                if depth < 1 {
                     return false;
                 }
             }
@@ -624,6 +672,17 @@ fn link_stays_inside(base_depth: usize, target: &Path) -> bool {
     }
     true
 }
+
+/// A pax *global* header is a real archive member as far as `tar` is concerned: the
+/// crate consumes GNU long names and pax per-file extensions itself, but hands this
+/// one to the caller as an ordinary entry named `pax_global_header`. It carries no
+/// file, `unpack_in` skips it, and only the top-level-directory bookkeeping would
+/// trip over it — so it is filtered there, before it can look like a second top
+/// level and fail the whole install.
+///
+/// Today's nodejs.org tarballs are GNU format and contain no such member. This is
+/// here so that switching to `tar --format=posix` upstream is not an outage.
+const PAX_GLOBAL: &str = "pax_global_header";
 
 /// Insist every member shares one top-level directory, and remember which.
 ///
@@ -639,6 +698,9 @@ fn note_top(top: &mut Option<String>, rel: &Path) -> Result<(), String> {
         .as_os_str()
         .to_string_lossy()
         .into_owned();
+    if first == PAX_GLOBAL {
+        return Ok(());
+    }
     match top {
         Some(t) if *t != first => Err(format!("归档里有多个顶层目录: {t} 和 {first}")),
         Some(_) => Ok(()),
@@ -647,6 +709,26 @@ fn note_top(top: &mut Option<String>, rel: &Path) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+/// Cap what may be *written*, as opposed to what may be downloaded.
+///
+/// [`MAX_ARCHIVE_BYTES`] bounds the transfer; it says nothing about the expansion
+/// ratio, and a crafted gzip well inside 128 MB can reach hundreds of gigabytes.
+/// The real archive unpacks to about 206 MB, so 1 GiB is generous headroom for a
+/// Node that grows and still a bound.
+const MAX_UNPACKED_BYTES: u64 = 1024 * 1024 * 1024;
+
+/// Add `n` to the running total, refusing to go past [`MAX_UNPACKED_BYTES`].
+fn bump_unpacked(total: u64, n: u64) -> Result<u64, String> {
+    let next = total.saturating_add(n);
+    if next > MAX_UNPACKED_BYTES {
+        return Err(format!(
+            "归档解出来超过 {} MiB，已中止",
+            MAX_UNPACKED_BYTES / 1024 / 1024
+        ));
+    }
+    Ok(next)
 }
 
 /// Unpack a `.tar.gz` into `root`, returning its single top-level directory name.
@@ -661,6 +743,7 @@ fn extract_tar_gz(archive: &Path, root: &Path) -> Result<String, String> {
     ar.set_preserve_permissions(cfg!(unix));
     ar.set_overwrite(true);
     let mut top: Option<String> = None;
+    let mut unpacked: u64 = 0;
     for entry in ar.entries().map_err(|e| format!("无法读取归档: {e}"))? {
         let mut entry = entry.map_err(|e| format!("无法读取归档条目: {e}"))?;
         let raw = entry
@@ -692,6 +775,10 @@ fn extract_tar_gz(archive: &Path, root: &Path) -> Result<String, String> {
                 ));
             }
         }
+        // tar reads exactly the declared size for a member, so the header is a
+        // faithful count here — unlike a zip's central directory, where the actual
+        // bytes copied are what get counted.
+        unpacked = bump_unpacked(unpacked, entry.header().size().unwrap_or(0))?;
         entry
             .unpack_in(root)
             .map_err(|e| format!("解压 {} 失败: {e}", rel.display()))?;
@@ -710,6 +797,7 @@ fn extract_zip(archive: &Path, root: &Path) -> Result<String, String> {
     let file = std::fs::File::open(archive).map_err(|e| format!("{}: {e}", archive.display()))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("无法读取归档: {e}"))?;
     let mut top: Option<String> = None;
+    let mut unpacked: u64 = 0;
     for i in 0..zip.len() {
         let mut member = zip
             .by_index(i)
@@ -737,8 +825,9 @@ fn extract_zip(archive: &Path, root: &Path) -> Result<String, String> {
         }
         let mut out =
             std::fs::File::create(&dest).map_err(|e| format!("{}: {e}", dest.display()))?;
-        std::io::copy(&mut member, &mut out)
+        let n = std::io::copy(&mut member, &mut out)
             .map_err(|e| format!("写入 {} 失败: {e}", dest.display()))?;
+        unpacked = bump_unpacked(unpacked, n)?;
         out.flush()
             .map_err(|e| format!("{}: {e}", dest.display()))?;
     }
@@ -817,15 +906,41 @@ pub async fn install(app: &AppHandle) -> Result<Version, String> {
 /// Remove any `.part` file or `.node-staging-*` / `.node-old-*` directory a
 /// previous run died inside. Only dot-prefixed names, and only directly under the
 /// prefix, so nothing a user put there is in scope.
+///
+/// Age-gated, because the pid in those names is not decoration: nothing stops a
+/// second launcher process from existing (no single-instance guard is registered),
+/// and [`crate::runtimes::install_lock`] only excludes installs inside one process.
+/// An unqualified sweep would let a starting install delete the staging tree — or,
+/// worse, the mid-swap rollback copy — of one already running next to it. A stale
+/// leftover is by definition not being written to, so anything touched recently is
+/// somebody else's and gets left alone.
+const LEFTOVER_MIN_AGE: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
 fn sweep_leftovers(prefix: &Path) {
     let Ok(entries) = std::fs::read_dir(prefix) else {
         return;
     };
     for e in entries.flatten() {
         let name = e.file_name().to_string_lossy().into_owned();
-        if name.starts_with(".node-staging-") || name.starts_with(".node-old-") {
+        let ours = name.starts_with(".node-staging-") || name.starts_with(".node-old-");
+        let part = name.starts_with("node-v") && name.ends_with(".part");
+        if !ours && !part {
+            continue;
+        }
+        let recent = e
+            .metadata()
+            .and_then(|m| m.modified())
+            .and_then(|t| t.elapsed().map_err(std::io::Error::other))
+            .map(|age| age < LEFTOVER_MIN_AGE)
+            // An unreadable or future mtime is treated as "recent" — refusing to
+            // delete is the safe way to be wrong here.
+            .unwrap_or(true);
+        if recent {
+            continue;
+        }
+        if ours {
             let _ = std::fs::remove_dir_all(e.path());
-        } else if name.starts_with("node-v") && name.ends_with(".part") {
+        } else {
             let _ = std::fs::remove_file(e.path());
         }
     }
@@ -866,13 +981,27 @@ fn unpack_and_swap(
             .map_err(|e| format!("无法移开旧的 {}: {e}", target.display()))?;
     }
     if let Err(e) = std::fs::rename(&unpacked, target) {
+        // Say where the previous tree went if putting it back also failed. Without
+        // this the message claims only that the install failed, while the only copy
+        // of the old Node sits under a dot-name the next sweep deletes — recoverable
+        // by re-downloading, but the user has no way to know that is what happened.
         if had_old {
-            let _ = std::fs::rename(&aside, target);
+            if let Err(back) = std::fs::rename(&aside, target) {
+                return Err(format!(
+                    "无法安装到 {}: {e}；而且旧的那份也没能放回去 ({back})，它现在在 {}",
+                    target.display(),
+                    aside.display()
+                ));
+            }
         }
         return Err(format!("无法安装到 {}: {e}", target.display()));
     }
     let _ = std::fs::remove_dir_all(&aside);
 
+    // Before `.version` exists, `probe` finds an executable with no recorded
+    // version — and with 自动检测 on it would spawn the freshly unpacked binary to
+    // ask, which is the one thing the managed row promises not to do. So this is not
+    // bookkeeping-after-the-fact; the tree is only fully installed once it is here.
     write_version(v)?;
     make_executable(target);
     log(app, format!("已安装 Node v{v} 到 {}\n", target.display()));
@@ -936,8 +1065,16 @@ pub async fn node_status() -> NodeStatus {
 
 /// Remove the managed tree. Not the user's own Node — [`dir`] is inside the
 /// launcher's prefix and nothing else is ever touched.
+///
+/// Takes the install lock, and not for tidiness: without it, 卸载 pressed during an
+/// install can land between the rename that makes the tree live and the
+/// `.version` write that finishes it, after which the install still reports success
+/// over a directory that is no longer there.
 #[tauri::command]
-pub fn uninstall_node() -> Result<(), String> {
+pub async fn uninstall_node() -> Result<(), String> {
+    let _guard = crate::runtimes::install_lock()
+        .try_lock()
+        .map_err(|_| "正在安装，等它结束再卸载".to_string())?;
     uninstall()
 }
 
@@ -956,6 +1093,10 @@ pub struct NodeTest {
 /// An explicit press, which is why it executes regardless of
 /// `auto_detect_version` — that checkbox governs the *passive* probe, not a button
 /// the user just pushed.
+///
+/// A failing npm is reported *inside* the result rather than as an `Err`: "node
+/// works, npm does not" is the diagnosis the user came for, and returning early
+/// would throw away the half that succeeded and show one error string instead.
 #[tauri::command]
 pub async fn test_node() -> Result<NodeTest, String> {
     let st = status().await;
@@ -966,10 +1107,19 @@ pub async fn test_node() -> Result<NodeTest, String> {
         .await
         .unwrap_or_default();
     let search = npm_search_path(&st.path, &path_var);
-    let node_output = run_version(&st.path, &search).await?;
+    let node_output = match run_version(&st.path, &search).await {
+        Ok(out) => out,
+        Err(e) => e,
+    };
     let (npm_path, npm_output) = match st.npm.as_str() {
         "" => (String::new(), "没有找到 npm".to_string()),
-        npm => (npm.to_string(), run_version(npm, &search).await?),
+        npm => (
+            npm.to_string(),
+            match run_version(npm, &search).await {
+                Ok(out) => out,
+                Err(e) => e,
+            },
+        ),
     };
     Ok(NodeTest {
         node_path: st.path,
@@ -1084,21 +1234,37 @@ mod tests {
 
     /// Node's own tarball contains symlinks and they are legitimate, so the rule
     /// cannot be "no links" — it has to be "no link that escapes".
+    ///
+    /// The frame of reference is what makes this subtle. Depths are counted from the
+    /// *staging* root, and staging holds exactly one directory which becomes
+    /// `runtimes/node`. So depth 1 is the tree that gets installed and depth 0 is the
+    /// npm prefix around it — a target landing there is outside the tree even though
+    /// it is inside the staging directory, and it would end up pointing next to
+    /// `node_modules/.bin`, which is on every child PATH.
     #[test]
     fn a_relative_link_inside_the_tree_is_fine_and_one_that_climbs_out_is_not() {
-        // `bin/npm` → `../lib/node_modules/npm/bin/npm-cli.js`, the real thing.
+        // The real thing: member `node-v24.20.0-linux-x64/bin/npm` (3 components, so
+        // base 2) → `../lib/node_modules/npm/bin/npm-cli.js`, landing at depth 1.
         assert!(link_stays_inside(
-            1,
+            2,
             Path::new("../lib/node_modules/npm/bin/npm-cli.js")
         ));
-        assert!(link_stays_inside(2, Path::new("../../lib/x")));
-        assert!(link_stays_inside(0, Path::new("./bin/node")));
+        assert!(link_stays_inside(3, Path::new("../../lib/x")));
+        assert!(link_stays_inside(1, Path::new("./bin/node")));
+
+        // Out of the tree, still inside staging — accepted before the floor moved to
+        // 1, and after the rename it points at the npm prefix itself.
+        assert!(!link_stays_inside(1, Path::new("../lib/x")));
+        assert!(!link_stays_inside(
+            2,
+            Path::new("../../node_modules/.bin/evil")
+        ));
 
         assert!(!link_stays_inside(1, Path::new("../../etc/passwd")));
         assert!(!link_stays_inside(0, Path::new("../anything")));
         assert!(!link_stays_inside(3, Path::new("/etc/passwd")));
         // Depth is checked as it goes, so a detour back inside does not launder it.
-        assert!(!link_stays_inside(1, Path::new("../../x/../lib")));
+        assert!(!link_stays_inside(2, Path::new("../../x/../lib")));
     }
 
     /// Nothing but plain components survives, so an absolute path, a `..` anywhere,
@@ -1174,10 +1340,16 @@ mod tests {
 
     /// A real Node layout — one top-level directory, an executable, and a relative
     /// symlink into a sibling directory — comes out intact.
+    ///
+    /// The leading `pax_global_header` is the shape a `tar --format=posix` switch
+    /// upstream would produce. `tar` hands it to us as an ordinary member, so without
+    /// the filter in `note_top` it reads as a second top-level directory and fails
+    /// the whole install; `unpack_in` ignores it either way.
     #[test]
     fn a_node_shaped_archive_extracts_with_its_links() {
         use tar::EntryType as E;
         let bytes = tar_gz(&[
+            ("pax_global_header", E::Regular, "", b"52 comment=x\n"),
             ("node-v24.20.0-linux-x64/", E::Directory, "", b""),
             ("node-v24.20.0-linux-x64/bin/node", E::Regular, "", b"#!x\n"),
             (
@@ -1255,6 +1427,10 @@ mod tests {
         let _lock = HOME_LOCK.lock().unwrap();
         let home = temp_tree("node-version");
         let _guard = EnvGuard::set("HOME", home.path());
+        // First, before a single byte is written: this test truncates a `node`
+        // executable and ends in `uninstall()`, so on a platform where redirecting
+        // HOME does not work it must fail rather than do that to the real tree.
+        crate::test_support::assert_home_redirected(home.path());
 
         let root = dir().unwrap();
         // Built from `managed_exe()` rather than a hardcoded `bin/node`, because the
@@ -1262,6 +1438,10 @@ mod tests {
         let exe = managed_exe().unwrap();
         std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
         std::fs::write(&exe, b"not an executable\n").unwrap();
+        // `probe` only accepts a managed tree that still has its own npm — a
+        // half-deleted one must not shadow a working host Node.
+        let npm = exe.with_file_name(if cfg!(windows) { "npm.cmd" } else { "npm" });
+        std::fs::write(&npm, b"#!/usr/bin/env node\n").unwrap();
 
         let v = Version {
             major: 24,
@@ -1303,5 +1483,13 @@ mod tests {
         assert!(!root.exists());
         let st = block_on(probe(&settings, ""));
         assert!(st.path.is_empty() && st.source.is_empty() && !st.ok);
+
+        // And a tree whose npm was deleted out from under it — a `remove_dir_all`
+        // that failed halfway — is not reported as a usable managed Node.
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&exe, b"not an executable\n").unwrap();
+        write_version(v).unwrap();
+        let st = block_on(probe(&settings, ""));
+        assert_ne!(st.source, "managed", "a tree with no npm is not usable");
     }
 }

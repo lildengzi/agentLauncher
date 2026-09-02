@@ -71,3 +71,26 @@ pub(crate) fn temp_tree(tag: &str) -> TempTree {
     std::fs::create_dir_all(&p).unwrap();
     TempTree(p)
 }
+
+/// Prove the launcher's data root really moved into `home`, *before* the test
+/// writes or deletes anything through it.
+///
+/// `EnvGuard::set("HOME", …)` does nothing on Windows: `dirs::home_dir()` there is
+/// `SHGetKnownFolderPath(FOLDERID_Profile)`, which reads no environment variable.
+/// So a test that reaches the disk through [`crate::launcher_config::agentlauncher_root`]
+/// and skips this check does not fail on Windows — it silently operates on the
+/// developer's real `~/.agentlauncher`, and a test that ends in `uninstall()` would
+/// delete a real 200 MB Node tree and still report green.
+///
+/// Call this first, so a platform where the redirection does not work fails the
+/// test having touched nothing.
+pub(crate) fn assert_home_redirected(home: &Path) {
+    let root = crate::launcher_config::agentlauncher_root().expect("data root");
+    assert!(
+        root.starts_with(home),
+        "HOME redirection did not take effect — {} is not under {}. \
+         Refusing to touch the real data root.",
+        root.display(),
+        home.display()
+    );
+}

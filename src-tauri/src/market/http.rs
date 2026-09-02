@@ -61,6 +61,30 @@ fn client() -> Result<&'static reqwest::Client, String> {
         .map_err(|e| e.clone())
 }
 
+/// The same transport for a caller that pinned the host — every hop must stay on
+/// it, and on the scheme it started with.
+///
+/// A market feed may legitimately redirect across hosts, so the client above must
+/// allow it. A checksum manifest may not: [`crate::node`] compares an archive
+/// against a `SHASUMS256.txt` it fetched itself, and if a redirect can move either
+/// one off `nodejs.org` then the comparison is between two files from the same
+/// unverified place — self-consistent and worth nothing.
+fn pinned_client() -> Result<&'static reqwest::Client, String> {
+    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                .connect_timeout(CONNECT_TIMEOUT)
+                .timeout(REQUEST_TIMEOUT)
+                .redirect(crate::download::same_host_redirect_policy())
+                .user_agent(USER_AGENT)
+                .build()
+                .map_err(|e| format!("cannot build HTTP client: {e}"))
+        })
+        .as_ref()
+        .map_err(|e| e.clone())
+}
+
 /// Validate a source URL before it is ever handed to the client, so "this row is
 /// misconfigured" is reported as such instead of as a network failure.
 pub fn parse_http_url(raw: &str) -> Result<reqwest::Url, String> {
@@ -78,14 +102,31 @@ pub fn parse_http_url(raw: &str) -> Result<reqwest::Url, String> {
     Ok(url)
 }
 
-/// GET `url`, refusing to hold more than `cap` bytes of its body.
+/// GET `url`, refusing to hold more than `cap` bytes of its body. Redirects may
+/// cross hosts — a user-typed feed URL legitimately does.
+pub async fn get_capped(url: &reqwest::Url, cap: usize) -> Result<Vec<u8>, String> {
+    get_with(client()?, url, cap).await
+}
+
+/// [`get_capped`] for a caller that pinned the host: no hop may leave it, and no
+/// hop may downgrade the scheme. Use this for anything whose *origin* is the point,
+/// such as a checksum manifest.
+pub async fn get_capped_pinned(url: &reqwest::Url, cap: usize) -> Result<Vec<u8>, String> {
+    get_with(pinned_client()?, url, cap).await
+}
+
+/// The transfer both share.
 ///
 /// The body is streamed rather than buffered by `reqwest` so the cap is enforced
 /// as bytes arrive: a host that promises 2 KB and then sends forever is cut off at
 /// the cap instead of after it has already been allocated. `Content-Length`, when
 /// present, is checked first purely to fail fast.
-pub async fn get_capped(url: &reqwest::Url, cap: usize) -> Result<Vec<u8>, String> {
-    let res = client()?
+async fn get_with(
+    client: &reqwest::Client,
+    url: &reqwest::Url,
+    cap: usize,
+) -> Result<Vec<u8>, String> {
+    let res = client
         .get(url.clone())
         .send()
         .await

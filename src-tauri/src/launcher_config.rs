@@ -247,9 +247,26 @@ pub fn get_launcher_config() -> Result<LauncherConfig, String> {
     Ok(read_or_default(&config_path()?))
 }
 
+/// Write the document the *frontend* owns — `ui`, `defaults`, `session` — and
+/// leave `node` exactly as it is on disk.
+///
+/// Not a nicety. Two writers share this file: the main window debounce-saves the
+/// whole document whenever any UI state changes, and the Node settings page saves
+/// `node` through [`set_node_settings`]. The frontend's `LauncherConfig` does not
+/// carry `node`, so a whole-document write from it arrives with the field absent
+/// and `#[serde(default)]` would helpfully refill it with the defaults — meaning
+/// one click in the sidebar would silently reset a hand-typed `node.exe`, the very
+/// escape hatch a user on a platform with no official build depends on.
+///
+/// Preserving it here rather than teaching the frontend about the field is the fix
+/// that also covers the *next* backend-owned section: a client may only overwrite
+/// what it knows it owns.
 #[tauri::command]
 pub fn set_launcher_config(config: LauncherConfig) -> Result<(), String> {
-    write_json_atomic(&config_path()?, &config)
+    let path = config_path()?;
+    let mut next = config;
+    next.node = read_or_default::<LauncherConfig>(&path).node;
+    write_json_atomic(&path, &next)
 }
 
 #[tauri::command]
@@ -411,6 +428,47 @@ mod tests {
         );
         assert_eq!(cfg.node.max_old_space_mb, 1024);
         fs::remove_file(&p).ok();
+    }
+
+    /// The frontend debounce-saves the *whole* config document on any UI change,
+    /// and its `LauncherConfig` has no `node` field — so a whole-document write
+    /// arrives with the section missing. It must not take the defaults with it.
+    ///
+    /// Without the preserve in [`set_launcher_config`] this is one sidebar click
+    /// erasing a hand-typed `node.exe`.
+    #[test]
+    fn a_whole_document_write_cannot_erase_the_node_section() {
+        let _lock = crate::test_support::HOME_LOCK.lock().unwrap();
+        let home = crate::test_support::temp_tree("cfg-node-preserve");
+        let _guard = crate::test_support::EnvGuard::set("HOME", home.path());
+        crate::test_support::assert_home_redirected(home.path());
+
+        set_node_settings(NodeSettings {
+            exe: "/opt/node/bin/node".into(),
+            auto_download: false,
+            max_old_space_mb: 1024,
+            ..Default::default()
+        })
+        .unwrap();
+
+        // Exactly what the frontend sends: every field it knows about, and `node`
+        // left at whatever `#[serde(default)]` produced.
+        let mut from_ui = LauncherConfig::default();
+        from_ui.session.selected_instance = "web-baseline".into();
+        set_launcher_config(from_ui).unwrap();
+
+        let got = get_launcher_config().unwrap();
+        assert_eq!(
+            got.session.selected_instance, "web-baseline",
+            "UI state saved"
+        );
+        assert_eq!(got.node.exe, "/opt/node/bin/node", "node.exe survived");
+        assert!(!got.node.auto_download);
+        assert_eq!(got.node.max_old_space_mb, 1024);
+
+        // And the Node page can still change it, which is the one writer that may.
+        set_node_settings(NodeSettings::default()).unwrap();
+        assert!(get_launcher_config().unwrap().node.exe.is_empty());
     }
 
     /// The instgroups overlay round-trips its order and per-group state.
